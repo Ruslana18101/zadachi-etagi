@@ -1,0 +1,16 @@
+{
+  "name": "ЗдЭ · Этажи Владивосток",
+  "short_name": "ЗдЭ",
+  "description": "Задачи Этажи · повестки собраний и задачи",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8f7f4",
+  "theme_color": "#dc2626",
+  "lang": "ru",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,4162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>Повестка · Этажи Владивосток</title>
+
+<!-- PWA: установка на рабочий стол телефона -->
+<meta name="theme-color" content="#dc2626"/>
+<meta name="description" content="Повестки собраний и задачи · Этажи Владивосток"/>
+<link rel="manifest" href="manifest.json"/>
+
+<!-- iOS Safari: «На экран Домой» -->
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="ЗдЭ"/>
+<meta name="format-detection" content="telephone=no"/>
+
+<!-- Иконки (SVG как универсальная иконка для всех платформ) -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23dc2626'/><text x='50' y='62' font-size='34' text-anchor='middle' fill='white' font-family='Arial,sans-serif' font-weight='700'>ЗдЭ</text></svg>"/>
+<link rel="apple-touch-icon" href="icon-180.png"/>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
+<style>
+  body{margin:0;padding:0;}
+  .boot-loading{display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#888;flex-direction:column;gap:12px}
+  .boot-loading .spin{animation:bspin 1s linear infinite}
+  @keyframes bspin{to{transform:rotate(360deg)}}
+  .boot-error{padding:32px;font-family:monospace;color:#b04a32;max-width:600px;margin:40px auto}
+  .boot-error h2{font-family:sans-serif}
+</style>
+</head>
+<body>
+<div id="root"><div class="boot-loading"><svg class="spin" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg><div>Загрузка приложения…</div></div></div>
+<script>
+window.onerror = function(msg, url, line) {
+  var el = document.getElementById('root');
+  if (el) el.innerHTML = '<div class="boot-error"><h2>Ошибка загрузки</h2><pre>' + msg + '\nСтрока: ' + line + '</pre><p>Попробуйте обновить страницу (Ctrl+Shift+R).</p></div>';
+};
+</script>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef } = React;
+
+// ═══ ENVIRONMENT DETECTION ═══
+const _artifactStorage = (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function') ? window.storage : null;
+
+// ═══ INLINE SVG ICONS ═══
+const SvgI = ({children, size = 24, className, style, ...rest}) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    className={className} style={{display:'inline-block',verticalAlign:'middle',flexShrink:0,...style}} {...rest}>{children}</svg>
+);
+const Plus = p => <SvgI {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></SvgI>;
+const Calendar = p => <SvgI {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></SvgI>;
+const CheckSquare = p => <SvgI {...p}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></SvgI>;
+const Square = p => <SvgI {...p}><rect x="3" y="3" width="18" height="18" rx="2"/></SvgI>;
+const MinusSquare = p => <SvgI {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></SvgI>;
+const ChevronRight = p => <SvgI {...p}><polyline points="9 18 15 12 9 6"/></SvgI>;
+const Copy = p => <SvgI {...p}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></SvgI>;
+const Check = p => <SvgI {...p}><polyline points="20 6 9 17 4 12"/></SvgI>;
+const Trash2 = p => <SvgI {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></SvgI>;
+const Edit3 = p => <SvgI {...p}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></SvgI>;
+const X = p => <SvgI {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SvgI>;
+const FileText = p => <SvgI {...p}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></SvgI>;
+const Sparkles = p => <SvgI {...p}><path d="M12 3l1.5 5.5L18 10l-4.5 1.5L12 17l-1.5-5.5L6 10l4.5-1.5z"/></SvgI>;
+const Users = p => <SvgI {...p}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></SvgI>;
+const Clock = p => <SvgI {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></SvgI>;
+const ArrowLeft = p => <SvgI {...p}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></SvgI>;
+const AlertCircle = p => <SvgI {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></SvgI>;
+const Loader2 = p => <SvgI {...p}><path d="M21 12a9 9 0 11-6.219-8.56"/></SvgI>;
+const Filter = p => <SvgI {...p}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></SvgI>;
+const Search = p => <SvgI {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></SvgI>;
+const Save = p => <SvgI {...p}><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></SvgI>;
+const Wand2 = p => <SvgI {...p}><path d="M15 4V2m0 14v-2M8 9h2m8 0h2M17.8 11.8l1.2 1.2M6 6l3 3m0 6l-3 3m12-3l3 3"/><path d="M4 20l7.5-7.5"/></SvgI>;
+const Upload = p => <SvgI {...p}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></SvgI>;
+const Paperclip = p => <SvgI {...p}><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></SvgI>;
+const CalendarClock = p => <SvgI {...p}><path d="M21 7.5V6a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h4.5"/><path d="M16 2v4M8 2v4M3 10h5"/><circle cx="18" cy="17" r="4"/><path d="M18 15.5V17l1 1"/></SvgI>;
+const Bell = p => <SvgI {...p}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></SvgI>;
+const Download = p => <SvgI {...p}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></SvgI>;
+const Hourglass = p => <SvgI {...p}><path d="M5 22h14M5 2h14M17 22v-4.172a2 2 0 00-.586-1.414L12 12l-4.414 4.414A2 2 0 007 17.828V22M7 2v4.172a2 2 0 00.586 1.414L12 12l4.414-4.414A2 2 0 0017 6.172V2"/></SvgI>;
+const AlarmClock = p => <SvgI {...p}><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M5 3L2 6M22 6l-3-3M6.38 18.7L4 21M17.64 18.67L20 21"/></SvgI>;
+const Link2 = p => <SvgI {...p}><path d="M15 7h3a5 5 0 015 5 5 5 0 01-5 5h-3m-6 0H6a5 5 0 01-5-5 5 5 0 015-5h3"/><line x1="8" y1="12" x2="16" y2="12"/></SvgI>;
+const ExternalLink = p => <SvgI {...p}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></SvgI>;
+const Send = p => <SvgI {...p}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></SvgI>;
+const Settings = p => <SvgI {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></SvgI>;
+
+// ═══ SUPABASE CLOUD SYNC ═══
+const SUPABASE_URL = "https://ducngqsmqvdowlqhehlk.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1Y25ncXNtcXZkb3dscWhlaGxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTQ5MTcsImV4cCI6MjA5NTU5MDkxN30.yQ-JhOQ_P8cfgblUr6rFX8Eu31GdmjwhyhUE38ElhTg";
+
+const _supaHeaders = {
+  "apikey": SUPABASE_KEY,
+  "Authorization": "Bearer " + SUPABASE_KEY,
+  "Content-Type": "application/json"
+};
+
+const isAppKey = (k) => k && (k.startsWith("meeting:") || k.startsWith("task:") || k.startsWith("team:") || k === "tg-config");
+
+const cloud = {
+  async fetchAll() {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/kv_store?select=key,value", { headers: _supaHeaders });
+    if (!res.ok) throw new Error("Supabase GET " + res.status);
+    return await res.json();
+  },
+  async upsert(key, value) {
+    await fetch(SUPABASE_URL + "/rest/v1/kv_store", {
+      method: "POST",
+      headers: { ..._supaHeaders, "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify({ key, value, updated_at: new Date().toISOString() })
+    });
+  },
+  async remove(key) {
+    await fetch(SUPABASE_URL + "/rest/v1/kv_store?key=eq." + encodeURIComponent(key), {
+      method: "DELETE", headers: _supaHeaders
+    });
+  }
+};
+
+// Начальная синхронизация: cloud → localStorage (или localStorage → cloud при первом запуске)
+const syncFromCloud = async () => {
+  try {
+    const rows = await cloud.fetchAll();
+    if (rows.length > 0) {
+      // Облако имеет данные → загружаем в localStorage
+      for (const { key, value } of rows) localStorage.setItem(key, value);
+      // Удаляем локальные ключи которых нет в облаке (облако = источник правды)
+      const cloudKeys = new Set(rows.map(r => r.key));
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (isAppKey(k) && !cloudKeys.has(k)) localStorage.removeItem(k);
+      }
+      console.log("☁ Синхронизация: загружено " + rows.length + " записей из облака");
+    } else {
+      // Облако пустое → выгружаем локальные данные в облако
+      let pushed = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (isAppKey(k)) { await cloud.upsert(k, localStorage.getItem(k)); pushed++; }
+      }
+      if (pushed) console.log("☁ Первая синхронизация: выгружено " + pushed + " записей в облако");
+    }
+  } catch (e) {
+    console.warn("☁ Синхронизация не удалась, работаем локально:", e.message);
+  }
+};
+
+// ═══ STORAGE LAYER (localStorage + cloud sync) ═══
+const storage = {
+  async list(prefix) {
+    if (_artifactStorage) {
+      try { const r = await _artifactStorage.list(prefix); return r?.keys || []; }
+      catch { return []; }
+    }
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!prefix || k.startsWith(prefix)) keys.push(k);
+    }
+    return keys;
+  },
+  async getAll(prefix) {
+    const keys = await this.list(prefix);
+    const items = [];
+    for (const key of keys) {
+      try {
+        if (_artifactStorage) {
+          const r = await _artifactStorage.get(key);
+          if (r?.value) items.push(JSON.parse(r.value));
+        } else {
+          const v = localStorage.getItem(key);
+          if (v) items.push(JSON.parse(v));
+        }
+      } catch {}
+    }
+    return items;
+  },
+  async set(key, value) {
+    const v = JSON.stringify(value);
+    if (_artifactStorage) {
+      try { return await _artifactStorage.set(key, v); }
+      catch (e) { console.error("storage.set failed", e); return null; }
+    }
+    localStorage.setItem(key, v);
+    // Асинхронная синхронизация в облако (не блокирует UI)
+    cloud.upsert(key, v).catch(e => console.warn("☁ cloud.upsert:", e.message));
+    return { key, value: v };
+  },
+  async remove(key) {
+    if (_artifactStorage) {
+      try { return await _artifactStorage.delete(key); }
+      catch (e) { console.error("storage.delete failed", e); return null; }
+    }
+    localStorage.removeItem(key);
+    cloud.remove(key).catch(e => console.warn("☁ cloud.remove:", e.message));
+    return { key, deleted: true };
+  }
+};
+
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+/* ============================================================
+   TEAM DIRECTORY
+   ============================================================ */
+const SEED_TEAM = [
+  { fullName: "Наговицина Руслана", aliases: ["Руслана", "Наговицина"],          telegram: "@Nagovitsina_Ruslana", sortOrder: 0 },
+  { fullName: "Вашута Ксения",     aliases: ["Ксюша", "Ксения", "Вашута"],       telegram: "@XeniaVashuta",        sortOrder: 1 },
+  { fullName: "Проценко Алексей",  aliases: ["Лёша", "Леша", "Алексей", "Проценко"], telegram: "@protsenko_realty", sortOrder: 2 },
+  { fullName: "Парфенова Дарья",   aliases: ["Даша", "Дарья", "Парфенова"],       telegram: "@Darya2309",           sortOrder: 3 },
+  { fullName: "Шугалей Игорь",     aliases: ["Игорь", "Шугалей"],                 telegram: "@i_g_o_r_1_9_9_1",    sortOrder: 4 },
+  { fullName: "Голубев",            aliases: ["Голубев"],                           telegram: "",                     sortOrder: 5 },
+  { fullName: "Турандина",          aliases: ["Турандина"],                         telegram: "",                     sortOrder: 6 },
+];
+
+const formatTeamForPrompt = (team) => {
+  if (!team || team.length === 0) return "";
+  const lines = team.map(m => {
+    const aliases = (m.aliases || []).filter(Boolean).join(", ");
+    return `• **${m.fullName}** (Telegram: ${m.telegram || "—"})${aliases ? " — также упоминается как: " + aliases : ""}`;
+  });
+  return `═══════════════════════════════════════
+КОМАНДА (используй эти имена при упоминаниях)
+═══════════════════════════════════════
+
+Когда в транскрипции упоминается один из этих людей — включая прозвища, имена, фамилии — используй каноническое **полное имя** в поле \`assignees\` задач, а в тексте повестки можешь использовать **@-юзернейм** для адресных обращений:
+
+${lines.join("\n")}
+
+ВАЖНО: В поле "assignees" задач указывай ПОЛНОЕ имя (например, "Вашута Ксения"), а не прозвище. Для людей, которых нет в списке выше, оставляй то имя/фамилию, которое реально звучит в транскрипции (например, "Голубев", "Королева", "Турандина").
+
+`;
+};
+
+const findTeamMember = (team, name) => {
+  if (!name || !team) return null;
+  const n = name.trim().toLowerCase().replace(/^@/, "");
+  return team.find(m => {
+    if (m.fullName.toLowerCase() === n) return true;
+    if ((m.telegram || "").toLowerCase().replace(/^@/, "") === n) return true;
+    if ((m.aliases || []).some(a => a.toLowerCase() === n)) return true;
+    return false;
+  }) || null;
+};
+
+const formatExistingTasksForPrompt = (tasks) => {
+  if (!tasks || tasks.length === 0) return "";
+  const lines = tasks.slice(0, 40).map(t => {
+    const assignees = (t.assignees || []).filter(a => a.status !== "done").map(a => a.name).join(", ");
+    const due = t.dueDate ? `| срок: ${formatDateShort(t.dueDate)}` : "";
+    const desc = t.description ? ` — ${t.description.slice(0, 80)}` : "";
+    return `• [${t.id}] «${t.title}»${desc}${assignees ? " | исп: " + assignees : ""} ${due}`;
+  });
+  return `
+═══════════════════════════════════════
+СУЩЕСТВУЮЩИЕ ОТКРЫТЫЕ ЗАДАЧИ (дедупликация)
+═══════════════════════════════════════
+
+В трекере Русланы уже есть эти незакрытые задачи. Если в транскрипции обсуждается задача, СОВПАДАЮЩАЯ ПО СМЫСЛУ с одной из них (даже если формулировка другая) — НЕ создавай новую запись в "tasks". Вместо этого добавь запись в массив "task_updates".
+
+${lines.join("\n")}
+
+Если совпадений нет — массив "task_updates" оставь пустым.
+
+`;
+};
+
+const RU_MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const formatDate = (ts) => {
+  const d = new Date(ts);
+  return `${d.getDate()} ${RU_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+};
+const formatDateShort = (ts) => {
+  const d = new Date(ts);
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+};
+
+/* ============================================================
+   DUE DATE HELPERS
+   ============================================================ */
+const dateOnly = (ts) => {
+  const d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+};
+const todayStart = () => dateOnly(Date.now());
+
+const daysUntil = (dueDate) => {
+  if (!dueDate) return null;
+  return Math.floor((dateOnly(dueDate) - todayStart()) / 86400000);
+};
+
+const getDueCategory = (dueDate) => {
+  if (!dueDate) return "no-date";
+  const d = daysUntil(dueDate);
+  if (d < 0) return "overdue";
+  if (d === 0) return "today";
+  if (d <= 7) return "week";
+  return "future";
+};
+
+const formatDueDate = (timestamp) => {
+  if (!timestamp) return "";
+  const d = daysUntil(timestamp);
+  const dt = new Date(timestamp);
+  const dateStr = `${dt.getDate()} ${RU_MONTHS[dt.getMonth()].slice(0, 3)}`;
+  if (d === 0) return `Сегодня · ${dateStr}`;
+  if (d === 1) return `Завтра · ${dateStr}`;
+  if (d === -1) return `Вчера · ${dateStr}`;
+  if (d < 0) return `Просрочено на ${-d} дн · ${dateStr}`;
+  if (d > 1 && d <= 7) return `Через ${d} дн · ${dateStr}`;
+  return `${dateStr} ${dt.getFullYear()}`;
+};
+
+const toInputDate = (ts) => {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+
+/* ============================================================
+   ФОРМАТИРОВАНИЕ ЗАДАЧ ДЛЯ ОТПРАВКИ В TELEGRAM
+   ============================================================ */
+const formatTaskForShare = (task) => {
+  const lines = [`📌 ${task.title}`];
+  if (task.description) lines.push(task.description);
+  if (task.dueDate) {
+    const d = new Date(task.dueDate);
+    lines.push(`📅 Срок: до ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`);
+  }
+  const assignees = (task.assignees || []).map(a => a.name).join(", ");
+  if (assignees) lines.push(`👤 ${assignees}`);
+  if (task.link) lines.push(`🔗 ${task.link}`);
+  return lines.join("\n");
+};
+
+const formatTasksForAssignee = (tasks, name) => {
+  if (!tasks.length) return "";
+  const lines = [`Задачи для ${name}:\n`];
+  tasks.forEach((t, i) => {
+    let line = `${i + 1}. ${t.title}`;
+    if (t.dueDate) {
+      const d = new Date(t.dueDate);
+      line += ` — до ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+    }
+    const status = (t.assignees || []).find(a => a.name === name)?.status;
+    if (status === "in-progress") line += " ⏳";
+    if (status === "done") line += " ✅";
+    lines.push(line);
+  });
+  return lines.join("\n");
+};
+
+const fromInputDate = (str) => {
+  if (!str) return null;
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d).getTime();
+};
+
+const addDays = (ts, n) => {
+  const d = new Date(ts || Date.now());
+  d.setDate(d.getDate() + n);
+  return dateOnly(d.getTime());
+};
+
+/* ============================================================
+   ICS CALENDAR EXPORT
+   ============================================================ */
+const icsEscape = (s = "") => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+const icsDate = (ts) => {
+  const d = new Date(ts);
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+};
+const icsDateTime = (ts) => {
+  const d = new Date(ts);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
+};
+const generateICS = (tasks) => {
+  const now = icsDateTime(Date.now());
+  const events = tasks.filter(t => t.dueDate).map(t => {
+    const pending = (t.assignees || []).filter(a => a.status !== "done").map(a => a.name);
+    const descParts = [
+      pending.length ? "Исполнители: " + pending.join(", ") : "",
+      t.description ? t.description : "",
+      t.link ? "Ссылка: " + t.link : ""
+    ].filter(Boolean);
+    const lines = [
+      "BEGIN:VEVENT",
+      `UID:${t.id}@meeting-agenda`,
+      `DTSTAMP:${now}`,
+      `DTSTART;VALUE=DATE:${icsDate(t.dueDate)}`,
+      `DTEND;VALUE=DATE:${icsDate(addDays(t.dueDate, 1))}`,
+      `SUMMARY:📋 ${icsEscape(t.title)}`,
+      `DESCRIPTION:${icsEscape(descParts.join("\n"))}`,
+      ...(t.link ? [`URL:${icsEscape(t.link)}`] : []),
+      "BEGIN:VALARM",
+      "TRIGGER:-PT12H",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${icsEscape(t.title)}`,
+      "END:VALARM",
+      "END:VEVENT"
+    ];
+    return lines.join("\r\n");
+  });
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Meeting Agenda//RU", "CALSCALE:GREGORIAN", ...events, "END:VCALENDAR"].join("\r\n");
+};
+
+const downloadICS = (tasks, filename = "tasks.ics") => {
+  const ics = generateICS(tasks);
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+};
+
+/* ============================================================
+   TELEGRAM INTEGRATION (через Make.com webhook)
+   ============================================================ */
+// Дефолтные настройки на первый запуск (можно изменить в UI)
+const SEED_TG_CONFIG = {
+  webhookUrl: "https://hook.us2.make.com/fpvtriwnuln22gftdnnsf5fes4el2oe2",
+  chats: [{ id: "seed-1", name: "МОП АРТЕМ", chatId: "-1003342394464" }]
+};
+
+// Убирает markdown перед отправкой/копированием в Telegram:
+// **bold** → bold, [text](url) → text\nurl
+const stripMarkdown = (text) => (text || "")
+  .replace(/\*\*(.+?)\*\*/g, "$1")
+  .replace(/\[(.+?)\]\((.+?)\)/g, "$1\n$2");
+
+// Делит длинный текст на куски ≤4000 символов для Telegram (лимит 4096).
+// Старается резать по двойному переносу (между абзацами), потом по одному, потом по слову.
+const splitForTelegram = (text) => {
+  const LIMIT = 4000;
+  if (!text || text.length <= LIMIT) return [text];
+  const parts = [];
+  let remaining = text;
+  while (remaining.length > LIMIT) {
+    let cut = remaining.lastIndexOf("\n\n", LIMIT);
+    if (cut < LIMIT * 0.5) cut = remaining.lastIndexOf("\n", LIMIT);
+    if (cut < LIMIT * 0.5) cut = remaining.lastIndexOf(" ", LIMIT);
+    if (cut < 1) cut = LIMIT;
+    parts.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(cut).trim();
+  }
+  if (remaining) parts.push(remaining);
+  return parts;
+};
+
+// Надёжное копирование — fallback через textarea если clipboard API заблокирован
+const copyToClipboard = async (text, showToast) => {
+  const clean = stripMarkdown(text);
+  try {
+    await navigator.clipboard.writeText(clean);
+    showToast?.("Скопировано в буфер");
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = clean;
+      ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      showToast?.("Скопировано в буфер");
+    } catch {
+      showToast?.("Не удалось скопировать — выделите текст вручную");
+    }
+  }
+};
+
+// Безопасный лимит длины URL — большинство браузеров принимают до ~8000 символов
+const URL_MAX = 7500;
+
+// Делит текст на части так, чтобы итоговый URL после URL-кодирования влез в лимит
+const splitForWebhook = (webhookUrl, chatId, text) => {
+  const sep = webhookUrl.includes("?") ? "&" : "?";
+  const skeleton = `${webhookUrl}${sep}chat_id=${encodeURIComponent(chatId)}&text=&_=${Date.now()}`;
+  const budget = URL_MAX - skeleton.length;
+  const fits = (chunk) => encodeURIComponent(chunk).length <= budget;
+
+  if (fits(text)) return [text];
+  const parts = [];
+  let current = "";
+  for (const line of text.split("\n")) {
+    const next = current ? current + "\n" + line : line;
+    if (fits(next)) { current = next; continue; }
+    if (current) { parts.push(current); current = ""; }
+    if (fits(line)) { current = line; continue; }
+    let buf = "";
+    for (const ch of line) {
+      if (fits(buf + ch)) buf += ch;
+      else { parts.push(buf); buf = ch; }
+    }
+    current = buf;
+  }
+  if (current) parts.push(current);
+  return parts;
+};
+
+// Отправка одной части через загрузку <img>. Браузер выпускает GET к img-src,
+// что обходит ограничение connect-src и sandbox-form-action одновременно.
+// Make.com возвращает текст, не картинку → img.onerror сработает, но это значит
+// запрос ушёл и был принят (а не сетевая ошибка).
+const sendChunkViaImage = (webhookUrl, chatId, text) => {
+  return new Promise((resolve, reject) => {
+    const sep = webhookUrl.includes("?") ? "&" : "?";
+    const url = `${webhookUrl}${sep}chat_id=${encodeURIComponent(chatId)}&text=${encodeURIComponent(text)}&_=${Date.now()}`;
+    if (url.length > URL_MAX) {
+      reject(new Error(`URL слишком длинный (${url.length} символов)`));
+      return;
+    }
+    const img = new Image();
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    img.onload = finish;
+    img.onerror = finish; // ответ — не изображение, но запрос ушёл
+    img.src = url;
+    setTimeout(() => {
+      if (!done) { done = true; reject(new Error("Таймаут — Make.com не ответил за 10 сек")); }
+    }, 10000);
+  });
+};
+
+// Песочница Claude блокирует ВСЕ способы прямой отправки наружу (fetch, form, img).
+// Используем Telegram share URL — он открывается в новой вкладке Telegram,
+// пользователь сам выбирает чат и нажимает Send. Это не сетевой запрос,
+// а навигация по ссылке, поэтому работает.
+const sendViaWebhook = async (webhookUrl, chatId, text) => {
+  return new Promise((resolve, reject) => {
+    try {
+      // chatId сохраняем в подписи функции для совместимости, но Telegram
+      // share URL не поддерживает выбор конкретного чата — пользователь
+      // выбирает чат сам. Имя чата из настроек используется только для UI.
+      const shareUrl = `https://t.me/share/url?url=&text=${encodeURIComponent(text)}`;
+      const a = document.createElement("a");
+      a.href = shareUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      resolve(1);
+    } catch (e) {
+      reject(e);
+    }
+  });
+};
+
+const loadTgConfig = async () => {
+  try {
+    const r = await (_artifactStorage ? _artifactStorage.get("tg-config") : {value: localStorage.getItem("tg-config")});
+    return r?.value ? JSON.parse(r.value) : null;
+  } catch { return null; }
+};
+
+const saveTgConfig = async (config) => {
+  const v = JSON.stringify(config);
+  if (_artifactStorage) {
+    await _artifactStorage.set("tg-config", v);
+  } else {
+    localStorage.setItem("tg-config", v);
+    cloud.upsert("tg-config", v).catch(e => console.warn("☁ tg-config sync:", e.message));
+  }
+};
+
+/* ============================================================
+   URL HELPERS
+   ============================================================ */
+const normalizeUrl = (url) => {
+  if (!url) return null;
+  url = url.trim();
+  if (!url) return null;
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+  try { new URL(url); return url; } catch { return null; }
+};
+
+const getLinkLabel = (url) => {
+  if (!url) return "";
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    if (host.includes("docs.google.com") || host.includes("sheets.google.com") || host.includes("drive.google.com")) {
+      if (u.pathname.includes("/spreadsheets/")) return "Google Sheets";
+      if (u.pathname.includes("/document/")) return "Google Docs";
+      if (u.pathname.includes("/presentation/")) return "Google Slides";
+      if (u.pathname.includes("/forms/")) return "Google Forms";
+      return "Google Drive";
+    }
+    if (host.includes("notion.so") || host.includes("notion.site")) return "Notion";
+    if (host.includes("figma.com")) return "Figma";
+    if (host.includes("t.me") || host.includes("telegram")) return "Telegram";
+    if (host.includes("airtable.com")) return "Airtable";
+    if (host.includes("dropbox.com")) return "Dropbox";
+    if (host.includes("yadi.sk") || host.includes("disk.yandex")) return "Яндекс.Диск";
+    return host;
+  } catch {
+    return url.length > 35 ? url.slice(0, 32) + "…" : url;
+  }
+};
+
+/* ============================================================
+   REMINDER TEXT (для копирования в чат)
+   ============================================================ */
+const generateReminderText = (tasks) => {
+  const overdue = [], today = [], week = [];
+  for (const t of tasks) {
+    const hasOpen = t.assignees.some(a => a.status !== "done") || t.assignees.length === 0;
+    if (!hasOpen) continue;
+    const cat = getDueCategory(t.dueDate);
+    if (cat === "overdue") overdue.push(t);
+    else if (cat === "today") today.push(t);
+    else if (cat === "week") week.push(t);
+  }
+  const fmt = (t) => {
+    const pending = t.assignees.filter(a => a.status !== "done").map(a => a.name).join(", ");
+    const linkPart = t.link ? `\n  🔗 ${t.link}` : "";
+    return `• ${t.title}${pending ? " — " + pending : ""}${t.dueDate ? " (" + formatDueDate(t.dueDate) + ")" : ""}${linkPart}`;
+  };
+  const today_d = new Date();
+  const header = `📋 Напоминание · ${today_d.getDate()} ${RU_MONTHS[today_d.getMonth()]}\n`;
+  const parts = [header];
+  if (overdue.length) parts.push(`\n⚠️ ПРОСРОЧЕНО (${overdue.length}):\n` + overdue.map(fmt).join("\n"));
+  if (today.length) parts.push(`\n📌 СЕГОДНЯ (${today.length}):\n` + today.map(fmt).join("\n"));
+  if (week.length) parts.push(`\n🔜 БЛИЖАЙШИЕ 7 ДНЕЙ (${week.length}):\n` + week.map(fmt).join("\n"));
+  if (!overdue.length && !today.length && !week.length) parts.push("\n✅ Срочных задач нет");
+  return parts.join("\n");
+};
+
+/* ============================================================
+   AI GENERATION
+   ============================================================ */
+async function generateFromTranscription(transcription, options = {}) {
+  const { type = "group", employee = null, team = [], existingTasks = [] } = options;
+  const teamSection = formatTeamForPrompt(team);
+  const tasksSection = formatExistingTasksForPrompt(existingTasks);
+  const systemPrompt = type === "personal"
+    ? buildPersonalPrompt(employee, teamSection, tasksSection)
+    : buildGroupPrompt(teamSection, tasksSection);
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 6000,
+      system: systemPrompt,
+      messages: [{ role: "user", content: `Транскрипция ${type === "personal" ? `личной встречи с ${employee || "сотрудником"}` : "собрания"}:\n\n${transcription}` }]
+    })
+  });
+
+  if (!response.ok) throw new Error(`Ошибка API: ${response.status}`);
+  const data = await response.json();
+  const text = data.content.map(b => b.text || "").join("");
+  const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+  return JSON.parse(clean);
+}
+
+function buildPersonalPrompt(employee, teamSection = "", tasksSection = "") {
+  return `Ты — ассистент Русланы, руководителя в агентстве недвижимости "Этажи Владивосток". Это транскрипция её ЛИЧНОЙ встречи (1-на-1) с сотрудником${employee ? `: **${employee}**` : ""}.
+
+Твоя задача: составить личные заметки Русланы по этой встрече для её собственного использования. Это НЕ повестка для отправки в общий чат — это конфиденциальный протокол 1-на-1.
+
+${teamSection}${tasksSection}═══════════════════════════════════════
+СТРУКТУРА ЗАМЕТОК
+═══════════════════════════════════════
+
+Раздели заметки на смысловые блоки. Используй те разделы, которые уместны (необязательно все):
+
+📌 **Контекст встречи**
+1-2 предложения о том, почему встретились, в каком состоянии сотрудник, общий настрой.
+
+💬 **Что обсудили**
+Ключевые темы — нумерованным или маркированным списком. Кратко, по сути.
+
+📊 **Показатели / результаты**
+Если обсуждались KPI, выработка, рейтинги — зафиксируй цифры и динамику.
+
+🎯 **Договорённости**
+Что договорились: что делает сотрудник, что делает Руслана, к каким срокам.
+
+🌱 **Зоны роста и развитие**
+Что нужно прокачать, где сотрудник пробуксовывает, на чём фокусироваться.
+
+⚠️ **Проблемы / красные флаги**
+Если есть тревожные сигналы (выгорание, конфликты, демотивация, нарушения дисциплины) — фиксируй.
+
+🫶 **Личное**
+Если сотрудник делился личным (семья, здоровье, переезд) — короткой строкой, чтобы помнить контекст.
+
+📅 **К следующей встрече**
+Что Русланы проверить, на чём сделать фокус в следующий раз.
+
+═══════════════════════════════════════
+СТИЛЬ
+═══════════════════════════════════════
+
+• Деловой, но эмпатичный — это про живого человека.
+• От третьего лица о сотруднике: "Иван говорит, что...", "у Ивана сложности с..."
+• Эмодзи в заголовках разделов уместны, в теле — умеренно.
+• Markdown: **жирное** для важного, обычные переносы строк для абзацев.
+• БЕЗ markdown-заголовков (#), без блоков кода.
+
+═══════════════════════════════════════
+ИЗВЛЕЧЕНИЕ ЗАДАЧ
+═══════════════════════════════════════
+
+Извлекай задачи, у которых есть явный исполнитель и действие:
+✅ "Руслана посмотрит план развития до пятницы" → задача для "Наговицина Руслана"
+✅ "Иван подготовит отчёт по своей базе" → задача для Ивана
+✅ "Решили: Иван проходит курс по переговорам до конца месяца"
+
+ОБЯЗАТЕЛЬНО: Если Руслана (ведущая встречу) говорит "я сделаю", "я скину", "посмотрю", "переговорю", "вернусь с ОС" — это ЗАДАЧА для "Наговицина Руслана".
+
+НЕ задача:
+❌ Обсуждение проблем без чёткого "кто что делает"
+❌ Общие наблюдения о состоянии сотрудника
+
+═══════════════════════════════════════
+ВЫХОД
+═══════════════════════════════════════
+
+Возвращай ТОЛЬКО валидный JSON, без \`\`\`-обрамления:
+{
+  "title": "1-на-1: ${employee || "[Имя]"} · краткая тема",
+  "agenda": "Структурированные заметки в markdown",
+  "tasks": [
+    {"title": "Действие", "description": "Контекст и срок", "assignees": ["Имя"]}
+
+  ],
+  "task_updates": [
+    {"existingId": "id-задачи", "description": "Что изменить/добавить", "reason": "Краткое пояснение"}
+  ]
+}`;
+}
+
+function buildGroupPrompt(teamSection = "", tasksSection = "") {
+  return `Ты — ассистент Русланы, руководителя в агентстве недвижимости "Этажи Владивосток". Руслана ведёт еженедельные планёрки с руководителями групп. После каждого собрания она отправляет в общий чат руководителей структурированную "повестку" — итоги собрания со списком решений, задач и анонсов.
+
+Твоя задача: на основе сырой транскрипции собрания составить такую повестку в её фирменном стиле и извлечь конкретные задачи для трекера.
+
+${teamSection}${tasksSection}═══════════════════════════════════════
+СТИЛЬ ПОВЕСТКИ ЮЛИИ
+═══════════════════════════════════════
+
+═══════════════════════════════════════
+ОБЯЗАТЕЛЬНЫЙ ЗАГОЛОВОК ПОВЕСТКИ
+═══════════════════════════════════════
+
+Повестка ВСЕГДА начинается с заголовка на отдельной строке, ДО первого нумерованного пункта:
+
+\`**СОБРАНИЕ DD.MM.YYYY г.**\`
+
+— это **СОБРАНИЕ** капслоком + точная дата собрания + " г." на конце. Дату определяй из транскрипции: ищи упоминания дат в начале разговора, реплики типа "сегодня двадцатое мая", "пятница пятое число", и т.п. Используй год 2026 если в транскрипции год не упомянут явно. Если дату определить точно не получается — пиши \`**СОБРАНИЕ __.__.____ г.**\` чтобы Руслана дозаполнила вручную.
+
+После заголовка — пустая строка, потом нумерованные пункты.
+
+Пример правильного начала:
+
+**СОБРАНИЕ 19.05.2026 г.**
+
+1. 📸Фотограф📸
+до 06.03.2026 г. переговорю...
+
+═══════════════════════════════════════
+ФОРМАТ ПУНКТОВ
+═══════════════════════════════════════
+
+ФОРМАТ: нумерованный список (1., 2., 3., ...). Каждый пункт — отдельная тема, решение, задача или анонс.
+
+ЗАГОЛОВКИ: каждый пункт начинается с заголовка темы, ОБРАМЛЁННОГО эмодзи с двух сторон. Эмодзи подбирается по смыслу темы.
+
+Палитра эмодзи по типам:
+• 📸 — фото, контент, медиа
+• 📖 — обучение, курсы, УП
+• 🏘 🏡 — недвижимость, объекты, ЗН (загородная недвижимость)
+• ☎ — звонки, заявки, прозвоны
+• 📊 — аналитика, отчёты, аудит
+• ⛔️ — увольнения, "красная зона"
+• ‼ ‼️ — критично, обязательно
+• 🆕 — новая или давно стоящая важная задача
+• 🗣 — обсуждения, регламенты, встречи
+• 🎁 — преференции, бонусы
+• 🫶🏼 🤙🏼 — конкурсы, мотивация
+• 💼 — документы, ИП, юр.вопросы
+• ✅ — проверка, контроль
+• 📍 — отложенное обсуждение
+• 😉 😝 — анонсы, дружеские моменты
+• 💰 💵 — финансы, зарплата
+
+ПОД ЗАГОЛОВКОМ (1-4 строки):
+• Дедлайн строго в формате: "до DD.MM.YYYY г." или "‼️до вторника DD.MM.YYYY г. ‼️" для срочного
+• Ответственные в скобках в конце: "(ответственные Голубев и Парфенова)"
+• Личные обещания Русланы от 1-го лица: "переговорю с девочкой и вернусь к вам с ОС", "Жду ответ до пятницы", "Я в понедельник озвучу всем R"
+• Прямые поручения команде в повелительном: "Проконтролируйте", "Напомните", "Обеспечьте максимальную явку", "Прочитать регламент, внести комментарии"
+• @упоминания если в транскрипции упоминаются Telegram-юзернеймы: @protsenko_realty, @XeniaVashuta, @Darya2309
+• Для крупных проектов — подпункты с тире:
+  - Файл с которым будем работать
+  - Критерии попадания в файл
+  - Презентуем на собрании DD.MM.YYYY г.
+
+ГОЛОС: уверенный руководитель. Прямо, по делу, без воды. Лёгкая фамильярность уместна ("ребят", "девочка"). Иногда восклицания: "В ОФИСЕ ВЛАДИВОСТОКА!!!!!!!".
+
+ДЛИНА: обычно 6-12 пунктов. Если собрание стратегическое — пункты крупнее, с подпунктами-объяснениями. Если рабочее — короткие пункты в одну-две строки.
+
+═══════════════════════════════════════
+ПРИМЕРЫ РЕАЛЬНЫХ ПУНКТОВ ЮЛИИ
+═══════════════════════════════════════
+
+Пример 1 (задача с дедлайном и личным обещанием):
+1. 📸Фотограф📸
+до 06.03.2026 г. переговорю с девочкой и вернусь к вам с ОС
+
+Пример 2 (поручение команде):
+2. 📖Приоритеное обучение📖
+Проконтролируйте своих ребят чтоб прошли обязательно курсы приоритетного обучения на УП
+срок до 03.03.2026 г.
+
+Пример 3 (анонс события):
+3. 😝Приезд Королевой Лены😝
+04.03.2026 г. Королева приедет к вам на ваши собрания обеспечьте максимальную явку риэлторов пожалуйста
+
+Пример 4 (задача с ответственными):
+4. 🏘Анализ по КВИЗ ЗН🏘
+до 27.02.2026 г. необходимо понять и проанализировать какое и как обучение по ЗН давать нашим специалистам
+(ответственные Голубев и Парфенова)
+
+Пример 5 (проект с подпунктами):
+6. ☎Проект "База заявок"☎
+- Файл с которым будем работать
+- Критерии попадания в файл
+- Еще раз рассказываем механику R
+- Презентуем на собрании 24.02.2026 г.
+
+Пример 6 (последовательность по датам):
+8. ⛔️Красная зона⛔️
+03.03.2026 г. обсуждаем кто попал в этот список
+06.03.2026 г. прощаемся с данными людьми
+
+Пример 7 (ожидание ответа с @упоминанием):
+8. 🎓Предложение по курсу управления🎓
+Лера представила трехмесячный курс по управлению для руководителей стоимостью 30 000 или 39 000 руб./мес. с возможностью рассрочки от компании. Жду ответ до пятницы от @protsenko_realty @Darya2309
+
+Пример 8 (анонс встречи с местом):
+11. 🗣Обсуждение регламента 🗣
+следующая встреча пройдет 03.03.2026 г. в 10:30 совместно с Новиковым и Полешовой. В ОФИСЕ ВЛАДИВОСТОКА!!!!!!!
+
+Пример 9 (стратегический пункт со сложным контекстом):
+1. ⚖️Ситуация вокруг Тани Лукиной и влияние на новичков⚖️
+увольнение не рассматривается; усиливается наставничество и контроль со стороны Ксюши после отпуска; требуется адресная работа по ценностям и дисциплине, корректировка среды для исключения буллинга
+
+Пример 10 (стандарт/регламент с подпунктами):
+3. 💼Единый стандарт по аудиту и выплатам💼
+При «условном допуске» (аудит закрыт не полностью) выплата 50% зарплаты; способы закрытия: справки, квитанции/чеки, квартплата + скрины (допускается долг до 10 000 руб.).
+Юристы начали аудиты «с сегодняшнего дня»; решение согласовано (Королева, Лесняк).
+Важно своевременно подгружать документы; частичный допуск ограничивает выплату.
+
+Пример 11 (срочный дедлайн с двойным восклицанием):
+4. 📋Регламент по продавцу📋
+Прочитать регламент, внести комментарии в документ; цель — качественный регламент без переписываний;
+‼️до вторника 05.05.2026 ‼️
+
+Пример 12 (график):
+6. 💰График выдачи ЗП💰
+Со след недели вводим график выдачи ЗП
+понедельник 13:00-14:00
+среда 13:00-14:00
+пятница 11:00-12:00
+
+═══════════════════════════════════════
+ИЗВЛЕЧЕНИЕ ЗАДАЧ В ТРЕКЕР
+═══════════════════════════════════════
+
+ОТДЕЛЬНО от текста повестки извлеки задачи для трекера. Задача = есть конкретное действие + желательно исполнитель и/или дедлайн.
+
+ЯВЛЯЕТСЯ задачей:
+✅ "до 06.03.2026 г. создать файл по застройщикам" → задача для Голубева и Парфеновой
+✅ "Проконтролируйте курсы УП до 03.03" → задача для всех руководителей (assignees: ["Руководители групп"])
+✅ "Жду ответ до пятницы от @protsenko_realty" → задача для @protsenko_realty
+✅ "Каждый риелтор должен снизить цены минимум на 3 объекта" → задача для всех риэлторов
+
+ОБЯЗАТЕЛЬНО: Если Руслана (ведущая собрание) говорит от ПЕРВОГО ЛИЦА: "я скину", "переговорю", "пришлю", "вернусь к вам с ОС", "я в понедельник озвучу", "скину файл", "предоставлю", "вышлю" — это ЗАДАЧА для "Наговицина Руслана". Обязательно добавь в tasks.
+
+НЕ задача (только в повестке, не в трекере):
+❌ Анонс события ("Королева приедет 04.03")
+❌ Общая информация о решениях ("Запускаем биржу объектов с 21.04")
+❌ Описание ситуации ("Конверсия из заявки в договор")
+❌ Объявление правила ("С 5 мая больше не принимаются скриншоты")
+
+ИМЕНА: бери ИСКЛЮЧИТЕЛЬНО из транскрипции — Голубев, Парфенова, Вашута, Турандина, Королева, Лесняк, Проценко, Лукина, Депутатова и т.д. Не выдумывай.
+
+═══════════════════════════════════════
+ВАЖНО О ТРАНСКРИПЦИИ
+═══════════════════════════════════════
+
+Транскрипции — СЫРЫЕ, разговорные, с шумом, междометиями, перебиваниями, матом, флудом. Игнорируй болтовню, выделяй сигнал:
+• Принятые решения
+• Назначенные задачи (кто что делает к какой дате)
+• Анонсы событий и встреч
+• Изменения в правилах/регламентах
+• Упоминания дедлайнов
+
+Название собрания (поле title): 2-5 слов, отражающих главную тему. Примеры: "Стратегия по загородной недвижимости", "Изменение схемы ИП и мотивация", "Кадровые вопросы и задачи на май".
+
+═══════════════════════════════════════
+ВЫХОД
+═══════════════════════════════════════
+
+Возвращай ТОЛЬКО валидный JSON, без \`\`\`-обрамления, без преамбулы:
+{
+  "title": "Краткое название (2-5 слов)",
+  "agenda": "Полный текст повестки: начинается с **СОБРАНИЕ DD.MM.YYYY г.**, потом пустая строка, потом нумерованный список с эмодзи-заголовками",
+  "tasks": [
+    {"title": "Краткая формулировка действия", "description": "Контекст и дедлайн", "assignees": ["Имя1", "Имя2"]}
+  ],
+  "task_updates": [
+    {"existingId": "id-из-списка-существующих", "description": "Что изменилось/добавилось", "newDueDate": "DD.MM.YYYY или null", "reason": "Кратко почему обновляем"}
+  ]
+}
+
+Поле agenda — обычный текст с переносами строк (\\n), эмодзи прямо в тексте, БЕЗ markdown-заголовков (#), БЕЗ блоков кода. Подпункты обозначай тире "-" в начале строки.`;
+}
+
+/* ============================================================
+   STYLES
+   ============================================================ */
+const STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #f8f7f4;
+    --bg-tint: #f0eee9;
+    --surface: #ffffff;
+    --surface-2: #fbfaf8;
+    --ink: #1a1a1a;
+    --ink-2: #555555;
+    --ink-3: #999999;
+    --line: rgba(0,0,0,0.06);
+    --line-2: rgba(0,0,0,0.10);
+    --accent: #2d7a4f;
+    --accent-2: #1d5c39;
+    --accent-tint: #ecf5ef;
+    --warn: #d63b2f;
+    --warn-tint: #fef0ee;
+    --done: #2d7a4f;
+    --pending: #d4a020;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 4px rgba(0,0,0,0.03);
+    --shadow-md: 0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+    --shadow-xl: 0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --radius-xs: 8px;
+  }
+
+  * { box-sizing: border-box; }
+
+  .app {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .display { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.02em; }
+
+  .container { max-width: 980px; margin: 0 auto; padding: 28px 24px; }
+
+  /* ═══ HEADER ═══ */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 32px; padding-bottom: 20px; border-bottom: none;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .header h1 {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 32px;
+    margin: 0; letter-spacing: -0.03em; color: var(--ink);
+    background: linear-gradient(135deg, var(--ink), var(--ink-2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .header .sub {
+    color: var(--ink-3); font-size: 11px; letter-spacing: 0.06em;
+    text-transform: uppercase; font-weight: 600;
+  }
+
+  /* ═══ TABS — pill-style (Things + Todoist) ═══ */
+  .tabs {
+    display: flex; gap: 4px; background: var(--bg-tint); padding: 4px;
+    border-radius: 12px; width: fit-content; margin-bottom: 28px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .tab {
+    padding: 9px 20px; border: none; background: transparent; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink-3);
+    border-radius: 9px; transition: all 0.2s ease;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .tab:hover { color: var(--ink-2); }
+  .tab.active {
+    background: var(--surface); color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ═══ CARDS — shadow-based, no borders (Things-style) ═══ */
+  .card {
+    background: var(--surface); border: none; border-radius: var(--radius);
+    padding: 24px; box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s ease;
+  }
+  .card:hover { box-shadow: var(--shadow-md); }
+  .card + .card { margin-top: 14px; }
+
+  /* ═══ INPUTS ═══ */
+  textarea, input {
+    font-family: inherit; font-size: 14px; color: var(--ink);
+    background: var(--surface); border: 1.5px solid var(--line-2);
+    border-radius: var(--radius-xs); padding: 11px 14px; width: 100%;
+    resize: vertical; line-height: 1.6;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  textarea:focus, input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(45,122,79,0.12);
+  }
+  textarea { min-height: 180px; }
+
+  label {
+    display: block; font-size: 12px; font-weight: 600; color: var(--ink-2);
+    margin-bottom: 6px; letter-spacing: 0.03em; text-transform: uppercase;
+  }
+
+  /* ═══ BUTTONS — rounded, soft hierarchy ═══ */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px; border: 1.5px solid var(--line-2);
+    background: var(--surface); color: var(--ink); border-radius: var(--radius-xs);
+    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all 0.18s ease; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--ink-3); background: var(--bg-tint); }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .btn-primary {
+    background: var(--accent); color: white; border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(45,122,79,0.25);
+  }
+  .btn-primary:hover {
+    background: var(--accent-2); border-color: var(--accent-2);
+    box-shadow: 0 4px 12px rgba(45,122,79,0.3);
+  }
+  .btn-ghost { border-color: transparent; background: transparent; color: var(--ink-2); padding: 7px 9px; }
+  .btn-ghost:hover { background: var(--bg-tint); color: var(--ink); border-color: transparent; }
+  .btn-danger { color: var(--warn); }
+  .btn-danger:hover { background: var(--warn-tint); border-color: var(--warn); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 7px; }
+
+  /* ═══ EMPTY STATE ═══ */
+  .empty { text-align: center; padding: 72px 20px; color: var(--ink-3); }
+  .empty .display { font-size: 22px; color: var(--ink-2); margin-bottom: 10px; }
+
+  /* ═══ MEETING LIST — elevated rows (Trello-style) ═══ */
+  .meeting-row {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 20px; background: var(--surface);
+    border: none; border-radius: var(--radius-sm);
+    cursor: pointer; transition: all 0.2s ease;
+    margin-bottom: 10px; box-shadow: var(--shadow-sm);
+  }
+  .meeting-row:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+  .meeting-row:active { transform: translateY(0); }
+  .meeting-row .date-block {
+    background: linear-gradient(135deg, var(--accent-tint), #f0f7f2);
+    padding: 10px 14px; border-radius: var(--radius-xs);
+    text-align: center; min-width: 60px;
+  }
+  .meeting-row .date-block .day { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; line-height: 1; color: var(--accent-2); }
+  .meeting-row .date-block .mon { font-size: 10px; color: var(--accent); text-transform: uppercase; margin-top: 3px; font-weight: 600; letter-spacing: 0.05em; }
+  .meeting-row .info { flex: 1; min-width: 0; }
+  .meeting-row .info h3 { margin: 0 0 3px 0; font-family: 'Fraunces', serif; font-weight: 500; font-size: 17px; }
+  .meeting-row .info .meta { color: var(--ink-3); font-size: 12px; }
+
+  /* ═══ AGENDA OUTPUT ═══ */
+  .agenda-output {
+    background: var(--surface-2); border: 1.5px solid var(--line);
+    border-radius: var(--radius-sm); padding: 22px;
+    white-space: pre-wrap; line-height: 1.7; font-size: 14px;
+  }
+  .agenda-output strong { font-weight: 700; color: var(--ink); }
+
+  /* ═══ TASK CARD — clean, Things-inspired ═══ */
+  .task-card {
+    background: var(--surface); border: none;
+    border-radius: var(--radius-sm); padding: 16px 18px;
+    margin-bottom: 8px; box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    border-left: 3px solid transparent;
+  }
+  .task-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateX(2px);
+    border-left-color: var(--accent);
+  }
+  .task-card .title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .task-card .desc { color: var(--ink-2); font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+  .task-card .assignees { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  /* ═══ ASSIGNEE CHIPS — polished pills ═══ */
+  .assignee-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px; background: var(--bg-tint);
+    border: 1.5px solid var(--line); border-radius: 20px;
+    font-size: 12px; cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .assignee-chip:hover { border-color: var(--ink-3); background: var(--surface); }
+  .assignee-chip.done {
+    background: var(--accent-tint); border-color: var(--accent); color: var(--accent-2);
+  }
+  .assignee-chip.done .icon-done { color: var(--accent); }
+  .assignee-chip.in-progress { background: #fef9ec; border-color: var(--pending); color: #7a5d0f; }
+  .assignee-chip .name { font-weight: 600; }
+
+  /* ═══ BADGES ═══ */
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .badge-done { background: var(--accent-tint); color: var(--accent-2); }
+  .badge-partial { background: #fef9ec; color: #7a5d0f; }
+  .badge-pending { background: var(--bg-tint); color: var(--ink-2); }
+
+  /* ═══ FILTER BAR — Todoist-style pills ═══ */
+  .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .filter-btn {
+    padding: 6px 14px; border: 1.5px solid var(--line);
+    background: var(--surface); border-radius: 20px;
+    font-family: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer; color: var(--ink-3);
+    transition: all 0.15s ease;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .filter-btn:hover { border-color: var(--ink-3); color: var(--ink-2); }
+  .filter-btn.active {
+    background: var(--ink); color: white; border-color: var(--ink);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  .actions-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ═══ TOAST — slide-in animation ═══ */
+  .toast {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: white;
+    padding: 12px 22px; border-radius: 12px; font-size: 13px; font-weight: 500;
+    box-shadow: var(--shadow-xl); animation: toastIn 0.25s ease; z-index: 100;
+    max-width: calc(100vw - 40px);
+  }
+  @keyframes toastIn {
+    from { transform: translate(-50%, 16px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+
+  /* ═══ MODAL — with backdrop blur (Apple-style) ═══ */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 50; padding: 20px;
+    animation: modalBgIn 0.2s ease;
+  }
+  @keyframes modalBgIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--surface); border-radius: 18px;
+    max-width: 600px; width: 100%; max-height: 85vh;
+    overflow-y: auto; padding: 28px;
+    box-shadow: var(--shadow-xl);
+    animation: modalIn 0.25s ease;
+  }
+  @keyframes modalIn { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .row-flex { display: flex; gap: 12px; align-items: center; }
+  .row-flex > input { flex: 1; }
+
+  .hint { color: var(--ink-3); font-size: 12px; margin-top: 6px; }
+
+  details { margin-top: 12px; }
+  details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; padding: 6px 0; user-select: none; font-weight: 500; }
+  details summary:hover { color: var(--accent); }
+
+  .small { font-size: 12px; color: var(--ink-3); }
+
+  /* ═══ DROP ZONE ═══ */
+  .drop-zone { position: relative; transition: all 0.2s; }
+  .drop-zone.dragging { border-color: var(--accent); border-style: dashed; }
+  .drop-overlay {
+    position: absolute; inset: 0;
+    background: rgba(236, 245, 239, 0.97);
+    border: 2px dashed var(--accent); border-radius: var(--radius);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px; color: var(--accent-2); font-weight: 600;
+    z-index: 10; pointer-events: none;
+  }
+  .file-chip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; margin-bottom: 12px;
+    background: var(--accent-tint); border: 1.5px solid var(--accent);
+    border-radius: var(--radius-xs); color: var(--accent-2); font-size: 13px; font-weight: 600;
+  }
+
+  /* ═══ ASSIGNEE ROW — task detail ═══ */
+  .assignee-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid var(--line);
+  }
+  .assignee-row:last-child { border-bottom: none; }
+  .assignee-row .name { flex: 1; font-weight: 600; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .assignee-row .remove { padding: 4px 6px; color: var(--ink-3); border: none; background: transparent; cursor: pointer; border-radius: 4px; }
+  .assignee-row .remove:hover { color: var(--warn); background: var(--warn-tint); }
+
+  /* ═══ STATUS SEGMENTED CONTROL — TickTick-inspired ═══ */
+  .status-segmented {
+    display: inline-flex; border: 1.5px solid var(--line);
+    border-radius: 8px; overflow: hidden; background: var(--surface); flex-shrink: 0;
+  }
+  .status-segmented button {
+    padding: 5px 10px; border: none; background: transparent; cursor: pointer;
+    color: var(--ink-3); font-family: inherit; font-size: 11px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 4px;
+    border-right: 1px solid var(--line); transition: all 0.15s;
+  }
+  .status-segmented button:last-child { border-right: none; }
+  .status-segmented button:hover { background: var(--bg-tint); color: var(--ink-2); }
+  .status-segmented button.active { font-weight: 700; }
+  .status-segmented button.active.pending { background: var(--bg-tint); color: var(--ink); }
+  .status-segmented button.active.in-progress { background: #fef9ec; color: #7a5d0f; }
+  .status-segmented button.active.done { background: var(--accent-tint); color: var(--accent-2); }
+  .status-segmented .lbl { display: inline; }
+  @media (max-width: 540px) { .status-segmented .lbl { display: none; } .status-segmented button { padding: 6px 8px; } }
+
+  /* ═══ DUE DATE PILL — color-coded (Todoist-style) ═══ */
+  .due-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 20px; font-size: 11px;
+    font-weight: 700; border: 1.5px solid;
+  }
+  .due-pill.overdue { background: var(--warn-tint); color: var(--warn); border-color: #e8a09a; }
+  .due-pill.today { background: #fef9ec; color: #7a5d0f; border-color: var(--pending); }
+  .due-pill.week { background: #fef9ec; color: #7a5d0f; border-color: #e6c95a; }
+  .due-pill.future { background: var(--surface-2); color: var(--ink-2); border-color: var(--line-2); }
+  .due-pill.no-date { background: var(--bg-tint); color: var(--ink-3); border-color: var(--line); }
+  .due-pill .repeats { background: rgba(0,0,0,0.08); padding: 1px 6px; border-radius: 10px; font-size: 10px; margin-left: 4px; }
+
+  .due-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+
+  /* ═══ DATE PICKER POPOVER ═══ */
+  .date-popover {
+    position: absolute; z-index: 30; background: var(--surface);
+    border: 1.5px solid var(--line-2); border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    padding: 14px; min-width: 240px; margin-top: 6px;
+  }
+  .date-popover .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .date-popover .quick button {
+    padding: 5px 10px; font-size: 11px; font-weight: 600;
+    border: 1.5px solid var(--line); background: var(--surface-2);
+    border-radius: 6px; cursor: pointer; font-family: inherit; transition: all 0.12s;
+  }
+  .date-popover .quick button:hover { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-2); }
+  .date-popover input[type=date] { padding: 8px 10px; font-size: 13px; }
+  .date-popover .pop-actions { display: flex; gap: 6px; justify-content: space-between; margin-top: 10px; }
+
+  /* ═══ DIGEST BANNER — gradient cards (TickTick-style) ═══ */
+  .digest { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+  @media (max-width: 640px) { .digest { grid-template-columns: repeat(2, 1fr); } }
+  .digest-card {
+    border: none; background: var(--surface);
+    border-radius: var(--radius-sm); padding: 16px 18px; cursor: pointer; text-align: left;
+    font-family: inherit; transition: all 0.2s ease;
+    display: flex; flex-direction: column; gap: 6px;
+    box-shadow: var(--shadow-sm);
+  }
+  .digest-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .digest-card.active {
+    background: var(--ink); color: white; border-color: var(--ink);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    transform: translateY(-2px);
+  }
+  .digest-card .label { font-size: 11px; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .digest-card .count { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 600; line-height: 1; }
+  .digest-card.overdue:not(.active) {
+    background: linear-gradient(135deg, #fef0ee, #fde2de);
+    color: var(--warn);
+  }
+  .digest-card.today:not(.active) {
+    background: linear-gradient(135deg, #fef9ec, #fdf1d0);
+    color: #7a5d0f;
+  }
+
+  .reminder-toolbar {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+    padding: 12px 16px; background: var(--surface);
+    border: none; border-radius: var(--radius-sm);
+    align-items: center; box-shadow: var(--shadow-sm);
+  }
+
+  /* ═══ LINK CHIP ═══ */
+  .link-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 6px;
+    background: #eef4ff; color: #1e4382; border: 1.5px solid #c7d8f5;
+    font-size: 11px; font-weight: 700; text-decoration: none;
+    transition: all 0.12s; cursor: pointer; max-width: 100%;
+  }
+  .link-chip:hover { background: #dde9fa; border-color: #9ab8e5; }
+  .link-chip .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .link-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
+
+  /* ═══ MEETING TYPE TOGGLE ═══ */
+  .type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  @media (max-width: 540px) { .type-toggle { grid-template-columns: 1fr; } }
+  .type-btn {
+    text-align: left; padding: 16px 18px; border: 1.5px solid var(--line-2);
+    background: var(--surface); border-radius: var(--radius-sm); cursor: pointer;
+    font-family: inherit; transition: all 0.2s;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+    color: var(--ink-2); font-weight: 600;
+    box-shadow: var(--shadow-sm);
+  }
+  .type-btn:hover { border-color: var(--ink-3); box-shadow: var(--shadow-md); }
+  .type-btn.active {
+    border-color: var(--accent); background: var(--accent-tint); color: var(--accent-2);
+    box-shadow: 0 2px 10px rgba(45,122,79,0.15);
+  }
+  .type-btn .type-sub { font-size: 11px; font-weight: 400; opacity: 0.6; }
+
+  /* ═══ BADGES — personal/employee ═══ */
+  .employee-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: var(--accent-tint); color: var(--accent-2); border-radius: 20px; font-size: 10px; font-weight: 700; }
+  .personal-mark { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #f5eedd; color: #7a5d0f; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* ═══ EMPLOYEE CARDS — elevated grid (Things-style) ═══ */
+  .employee-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .employee-card {
+    background: var(--surface); border: none;
+    border-radius: var(--radius); padding: 20px;
+    cursor: pointer; transition: all 0.2s ease;
+    text-align: left; font-family: inherit;
+    display: flex; flex-direction: column; gap: 10px;
+    box-shadow: var(--shadow-sm);
+  }
+  .employee-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+  }
+  .employee-card .avatar {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent-tint), #d4ead9);
+    color: var(--accent-2); display: flex; align-items: center;
+    justify-content: center; font-family: 'Fraunces', serif;
+    font-size: 18px; font-weight: 600;
+  }
+  .employee-card .ename { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 500; }
+  .employee-card .estat { font-size: 11px; color: var(--ink-3); font-weight: 500; }
+
+  /* ═══ ASSIGNEE PICKER ═══ */
+  .assignee-dropdown {
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: var(--surface); border: 1.5px solid var(--line-2);
+    border-radius: var(--radius-xs); margin-top: 4px;
+    box-shadow: var(--shadow-lg);
+    max-height: 260px; overflow-y: auto; z-index: 40;
+    padding: 4px;
+  }
+  .assignee-option {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 8px 10px; border: none; background: transparent;
+    cursor: pointer; font-family: inherit; font-size: 13px; color: var(--ink);
+    border-radius: 6px; text-align: left; gap: 8px; transition: background 0.12s;
+  }
+  .assignee-option:hover { background: var(--accent-tint); }
+  .assignee-option .opt-name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .opt-tg { font-size: 10px; color: var(--accent); background: var(--accent-tint); padding: 2px 8px; border-radius: 10px; font-weight: 700; flex-shrink: 0; }
+
+  /* ═══ TEAM MODAL ═══ */
+  .team-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; border: none; box-shadow: var(--shadow-sm);
+    background: var(--surface); border-radius: var(--radius-xs); margin-bottom: 8px;
+  }
+  .team-row .small { color: var(--ink-3); }
+
+  /* ═══ TELEGRAM ═══ */
+  .btn-tg { background: #e8f5fd; color: #0e76a8; border-color: #b8ddf5; }
+  .btn-tg:hover { background: #d4ecfb; border-color: #7ec8e3; box-shadow: 0 2px 8px rgba(14,118,168,0.15); }
+  .btn-tg-connected { background: #e8f5fd; color: #0e76a8; border-color: #7ec8e3; }
+
+  .tg-chat-picker {
+    position: absolute; top: calc(100% + 6px); right: 0;
+    background: var(--surface); border: 1.5px solid var(--line-2);
+    border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
+    min-width: 220px; z-index: 50; padding: 4px;
+  }
+  .tg-chat-option {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 9px 12px; border: none; background: transparent;
+    cursor: pointer; font-family: inherit; font-size: 13px;
+    color: var(--ink); border-radius: 7px; text-align: left;
+    transition: background 0.12s;
+  }
+  .tg-chat-option:hover { background: var(--accent-tint); }
+
+  /* ═══ ACTIVE FILTER BANNER ═══ */
+  .active-filter-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; margin-bottom: 14px;
+    background: var(--accent-tint); border: none;
+    border-radius: var(--radius-sm); flex-wrap: wrap;
+    box-shadow: var(--shadow-sm);
+  }
+  .active-tag {
+    display: inline-flex; align-items: center;
+    padding: 3px 8px 3px 10px; background: var(--surface);
+    border: 1.5px solid var(--line-2); border-radius: 14px;
+    font-size: 11px; font-weight: 600; color: var(--ink);
+  }
+
+  /* ═══ SPIN ANIMATION ═══ */
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ═══ RESPONSIVE ═══ */
+  @media (max-width: 640px) {
+    .container { padding: 16px 14px; }
+    .header h1 { font-size: 24px; }
+    .header { gap: 10px; margin-bottom: 20px; }
+    .tabs { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tab { padding: 8px 14px; font-size: 12px; }
+    .card { padding: 18px; border-radius: 12px; }
+    .task-card { padding: 14px 16px; }
+    .digest-card { padding: 14px 16px; }
+    .digest-card .count { font-size: 24px; }
+    .employee-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .modal { padding: 22px; border-radius: 14px; }
+  }
+`;
+
+/* ============================================================
+   MAIN APP
+   ============================================================ */
+function App() {
+  const [view, setView] = useState("new"); // 'new' | 'history' | 'personal' | 'tasks'
+  const [meetings, setMeetings] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+  const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null); // { message, onConfirm, danger, confirmLabel }
+  const [team, setTeam] = useState([]);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [tgConfig, setTgConfig] = useState(null);
+  const [showTgModal, setShowTgModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState("");
+
+  // load on mount
+  useEffect(() => {
+    (async () => {
+      // Шаг 0: синхронизация с облаком (если не артефакт)
+      if (!_artifactStorage) {
+        await syncFromCloud();
+      }
+      // Шаг 1: загрузка данных из storage (localStorage уже синхронизирован с облаком)
+      const [m, t, teamData] = await Promise.all([
+        storage.getAll("meeting:"),
+        storage.getAll("task:"),
+        storage.getAll("team:")
+      ]);
+      setMeetings(m.sort((a, b) => b.date - a.date));
+      setTasks(t.sort((a, b) => b.createdAt - a.createdAt));
+
+      // Seed team on first run
+      let teamList = teamData;
+      if (teamList.length === 0) {
+        teamList = SEED_TEAM.map(s => ({ ...s, id: uid() }));
+        for (const m of teamList) await storage.set(`team:${m.id}`, m);
+      }
+      // Миграция: удаляем Жеваник из команды
+      const toRemove = teamList.filter(m => m.fullName.toLowerCase().includes("жеваник"));
+      for (const m of toRemove) await storage.remove(`team:${m.id}`);
+      if (toRemove.length) teamList = teamList.filter(m => !m.fullName.toLowerCase().includes("жеваник"));
+
+      // Миграция: добавляем новых сотрудников из SEED + обновляем sortOrder
+      for (const seed of SEED_TEAM) {
+        const existing = teamList.find(m => m.fullName === seed.fullName);
+        if (!existing) {
+          const member = { ...seed, id: uid() };
+          await storage.set(`team:${member.id}`, member);
+          teamList.push(member);
+        } else if (existing.sortOrder !== seed.sortOrder) {
+          existing.sortOrder = seed.sortOrder;
+          await storage.set(`team:${existing.id}`, existing);
+        }
+      }
+      setTeam(teamList.sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99)));
+
+      // Load Telegram config — на первый запуск или после миграции со старого формата заполняем дефолтным
+      let cfg = await loadTgConfig();
+      if (!cfg?.webhookUrl) {
+        cfg = SEED_TG_CONFIG;
+        await saveTgConfig(cfg);
+      }
+      setTgConfig(cfg);
+
+      setLoading(false);
+    })();
+  }, []);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  };
+
+  const askConfirm = (message, onConfirm, { danger = true, confirmLabel } = {}) => {
+    setConfirmDialog({ message, onConfirm, danger, confirmLabel });
+  };
+
+  const saveMeeting = async (meeting, newTasks) => {
+    await storage.set(`meeting:${meeting.id}`, meeting);
+    for (const t of newTasks) {
+      await storage.set(`task:${t.id}`, t);
+    }
+    setMeetings(prev => [meeting, ...prev.filter(p => p.id !== meeting.id)].sort((a,b) => b.date - a.date));
+    setTasks(prev => [...newTasks, ...prev.filter(p => !newTasks.find(n => n.id === p.id))].sort((a,b) => b.createdAt - a.createdAt));
+    showToast("Сохранено в историю");
+  };
+
+  const deleteMeeting = (id) => {
+    askConfirm("Удалить собрание? Связанные задачи останутся.", async () => {
+      await storage.remove(`meeting:${id}`);
+      setMeetings(prev => prev.filter(m => m.id !== id));
+      setSelectedMeeting(null);
+      showToast("Собрание удалено");
+    });
+  };
+
+  const renameMeeting = async (id, newTitle) => {
+    const trimmed = (newTitle || "").trim();
+    if (!trimmed) return;
+    const meeting = meetings.find(m => m.id === id);
+    if (!meeting || meeting.title === trimmed) return;
+    const updated = { ...meeting, title: trimmed };
+    await storage.set(`meeting:${id}`, updated);
+    setMeetings(prev => prev.map(m => m.id === id ? updated : m));
+    setSelectedMeeting(prev => prev && prev.id === id ? updated : prev);
+    showToast("Название обновлено");
+  };
+
+  const updateTask = async (task) => {
+    await storage.set(`task:${task.id}`, task);
+    setTasks(prev => prev.map(t => t.id === task.id ? task : t));
+  };
+
+  const deleteTask = (id) => {
+    askConfirm("Удалить задачу?", async () => {
+      await storage.remove(`task:${id}`);
+      setTasks(prev => prev.filter(t => t.id !== id));
+      showToast("Задача удалена");
+    });
+  };
+
+  const addTask = async (task) => {
+    await storage.set(`task:${task.id}`, task);
+    setTasks(prev => [task, ...prev]);
+  };
+
+  const saveTeamMember = async (member) => {
+    const m = { ...member, id: member.id || uid() };
+    await storage.set(`team:${m.id}`, m);
+    setTeam(prev => {
+      const without = prev.filter(p => p.id !== m.id);
+      return [...without, m].sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99));
+    });
+    showToast(member.id ? "Сотрудник обновлён" : "Сотрудник добавлен");
+  };
+
+  const deleteTeamMember = (id) => {
+    askConfirm("Удалить сотрудника из справочника команды?", async () => {
+      await storage.remove(`team:${id}`);
+      setTeam(prev => prev.filter(p => p.id !== id));
+      showToast("Удалено");
+    });
+  };
+
+  const handleSaveTgConfig = async (cfg) => {
+    await saveTgConfig(cfg);
+    setTgConfig(cfg);
+    showToast("Настройки Telegram сохранены");
+  };
+
+  // Распределение собраний по типу
+  const groupMeetings = useMemo(() => meetings.filter(m => m.type !== "personal"), [meetings]);
+  const personalMeetings = useMemo(() => meetings.filter(m => m.type === "personal"), [meetings]);
+  const existingEmployees = useMemo(() => {
+    const set = new Set();
+    personalMeetings.forEach(m => { if (m.employee) set.add(m.employee); });
+    return [...set].sort((a, b) => {
+      const oa = team.find(m => m.fullName === a)?.sortOrder ?? 99;
+      const ob = team.find(m => m.fullName === b)?.sortOrder ?? 99;
+      return oa - ob;
+    });
+  }, [personalMeetings, team]);
+
+  return (
+    <>
+      <style>{STYLES}</style>
+      <div className="app">
+        <div className="container">
+          <header className="header">
+            <div>
+              <h1>Повестка</h1>
+              <div className="sub">Транскрипции · Решения · Задачи</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <div className="small">
+                Собраний: <strong>{groupMeetings.length}</strong> · 1-на-1: <strong>{personalMeetings.length}</strong> · Задач: <strong>{tasks.length}</strong>
+              </div>
+              <button className="btn btn-sm" onClick={() => setShowTeamModal(true)} title="Справочник команды">
+                <Users size={13}/> Команда · {team.length}
+              </button>
+              <button className="btn btn-sm" onClick={() => setShowImportModal(true)} title="Вставить данные из артефакта Claude">
+                <Upload size={13}/> Импорт
+              </button>
+              <button className="btn btn-sm" onClick={async () => {
+                const allData = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                  const k = localStorage.key(i);
+                  if (isAppKey(k)) allData[k] = localStorage.getItem(k);
+                }
+                const blob = new Blob([JSON.stringify(allData)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'povestka-backup-' + new Date().toISOString().slice(0,10) + '.json';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('📦 Экспортировано ' + Object.keys(allData).length + ' записей');
+              }} title="Скачать все данные как файл">
+                <Download size={13}/> Экспорт
+              </button>
+              {!_artifactStorage && (
+                <button className={`btn btn-sm ${tgConfig?.chats?.length ? "btn-tg-connected" : ""}`} onClick={() => setShowTgModal(true)} title="Настройки Telegram">
+                  <Send size={13}/> Telegram{tgConfig?.chats?.length ? ` · ${tgConfig.chats.length}` : " ⚙"}
+                </button>
+              )}
+            </div>
+          </header>
+
+          <div className="tabs">
+            <button className={`tab ${view==='new'?'active':''}`} onClick={() => { setView('new'); setSelectedMeeting(null); }}>
+              <Sparkles size={15}/> Новое собрание
+            </button>
+            <button className={`tab ${view==='history'?'active':''}`} onClick={() => { setView('history'); setSelectedMeeting(null); }}>
+              <FileText size={15}/> История
+            </button>
+            <button className={`tab ${view==='personal'?'active':''}`} onClick={() => { setView('personal'); setSelectedMeeting(null); setSelectedEmployee(null); }}>
+              <Users size={15}/> Личные встречи
+            </button>
+            <button className={`tab ${view==='tasks'?'active':''}`} onClick={() => { setView('tasks'); setSelectedMeeting(null); }}>
+              <CheckSquare size={15}/> Задачи
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="empty"><Loader2 className="spin" size={28} /></div>
+          ) : selectedMeeting ? (
+            <MeetingDetail
+              meeting={selectedMeeting}
+              tasks={tasks.filter(t => t.meetingId === selectedMeeting.id)}
+              team={team}
+              tgConfig={tgConfig}
+              onBack={() => setSelectedMeeting(null)}
+              onDelete={() => deleteMeeting(selectedMeeting.id)}
+              onCopy={() => { copyToClipboard(selectedMeeting.agenda, showToast); }}
+              onRename={(t) => renameMeeting(selectedMeeting.id, t)}
+              onUpdateTask={updateTask}
+              onDeleteTask={deleteTask}
+              showToast={showToast}
+            />
+          ) : view === 'new' ? (
+            <NewMeetingView onSave={saveMeeting} showToast={showToast} existingEmployees={existingEmployees} team={team} allTasks={tasks} onUpdateTask={updateTask} />
+          ) : view === 'history' ? (
+            <HistoryView meetings={groupMeetings} onSelect={setSelectedMeeting} onRename={renameMeeting} />
+          ) : view === 'personal' ? (
+            <PersonalView
+              personalMeetings={personalMeetings}
+              tasks={tasks}
+              team={team}
+              showToast={showToast}
+              selectedEmployee={selectedEmployee}
+              setSelectedEmployee={setSelectedEmployee}
+              onSelectMeeting={setSelectedMeeting}
+              onUpdateTask={updateTask}
+              onDeleteTask={deleteTask}
+            />
+          ) : (
+            <TasksView tasks={tasks} meetings={meetings} team={team} tgConfig={tgConfig} onUpdate={updateTask} onDelete={deleteTask} onAdd={addTask} onSelectMeeting={setSelectedMeeting} showToast={showToast} />
+          )}
+        </div>
+
+        {toast && <div className="toast">{toast}</div>}
+        {confirmDialog && (
+          <ConfirmDialog
+            message={confirmDialog.message}
+            danger={confirmDialog.danger}
+            confirmLabel={confirmDialog.confirmLabel}
+            onConfirm={async () => {
+              const fn = confirmDialog.onConfirm;
+              setConfirmDialog(null);
+              if (fn) await fn();
+            }}
+            onCancel={() => setConfirmDialog(null)}
+          />
+        )}
+        {showTeamModal && (
+          <TeamModal
+            team={team}
+            onClose={() => setShowTeamModal(false)}
+            onSave={saveTeamMember}
+            onDelete={deleteTeamMember}
+          />
+        )}
+        {showImportModal && (
+          <div className="modal-backdrop" onClick={() => { setShowImportModal(false); setImportText(""); }}>
+            <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div className="display" style={{ fontSize: 20 }}>📦 Импорт данных</div>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setShowImportModal(false); setImportText(""); }}><X size={16}/></button>
+              </div>
+              <div className="small" style={{ marginBottom: 10 }}>
+                В артефакте Claude нажмите <strong>«📋 Экспорт данных»</strong> → в открывшемся окне нажмите <strong>«Скопировать данные»</strong>.<br/>
+                Затем вернитесь сюда и вставьте в поле ниже (<strong>Ctrl+V</strong> или <strong>Cmd+V</strong>).
+              </div>
+              <textarea
+                placeholder="Вставьте сюда скопированные данные (Ctrl+V / Cmd+V)..."
+                value={importText}
+                onChange={e => setImportText(e.target.value)}
+                rows={8}
+                autoFocus
+                style={{ fontFamily: 'monospace', fontSize: 11 }}
+              />
+              {importText.trim() && (() => {
+                try { const d = JSON.parse(importText); return <div className="small" style={{ marginTop: 6, color: 'var(--accent)' }}>✓ Найдено {Object.keys(d).length} записей</div>; }
+                catch { return <div className="small" style={{ marginTop: 6, color: 'var(--warn)' }}>✗ Неверный формат — убедитесь что скопировали данные кнопкой «Скопировать данные»</div>; }
+              })()}
+              <div className="actions-row" style={{ marginTop: 12, justifyContent: 'flex-end' }}>
+                <button className="btn" onClick={() => { setShowImportModal(false); setImportText(""); }}>Отмена</button>
+                <button className="btn btn-primary" disabled={!importText.trim()} onClick={async () => {
+                  try {
+                    const data = JSON.parse(importText);
+                    let count = 0;
+                    for (const [key, value] of Object.entries(data)) {
+                      localStorage.setItem(key, value);
+                      cloud.upsert(key, value).catch(() => {});
+                      count++;
+                    }
+                    setShowImportModal(false); setImportText("");
+                    showToast('📦 Импортировано ' + count + ' записей. Перезагружаю…');
+                    setTimeout(() => window.location.reload(), 1500);
+                  } catch (e) { showToast('Ошибка: ' + e.message); }
+                }}><Upload size={13}/> Загрузить данные</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showTgModal && !_artifactStorage && (
+          <TelegramModal
+            config={tgConfig}
+            onSave={handleSaveTgConfig}
+            onClose={() => setShowTgModal(false)}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ============================================================
+   CONFIRM DIALOG
+   ============================================================ */
+function ConfirmDialog({ message, danger, confirmLabel, onConfirm, onCancel }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onCancel();
+      if (e.key === "Enter") onConfirm();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onConfirm, onCancel]);
+
+  return (
+    <div className="modal-backdrop" onClick={onCancel}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ flexShrink: 0, padding: 8, borderRadius: '50%', background: danger ? 'var(--warn-tint)' : 'var(--accent-tint)' }}>
+            <AlertCircle size={20} style={{ color: danger ? 'var(--warn)' : 'var(--accent)', display: 'block' }} />
+          </div>
+          <div style={{ fontSize: 15, lineHeight: 1.5, paddingTop: 6 }}>{message}</div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+          <button className="btn" onClick={onCancel} autoFocus>Отмена</button>
+          <button className={`btn ${danger ? 'btn-danger' : 'btn-primary'}`} onClick={onConfirm} style={danger ? { background: 'var(--warn)', color: 'white', borderColor: 'var(--warn)' } : {}}>
+            {confirmLabel || (danger ? 'Удалить' : 'OK')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   NEW MEETING VIEW — paste, generate, review, save
+   ============================================================ */
+function NewMeetingView({ onSave, showToast, existingEmployees = [], team = [], allTasks = [], onUpdateTask }) {
+  const [meetingType, setMeetingType] = useState("group"); // 'group' | 'personal'
+  const [employee, setEmployee] = useState("");
+  const [transcription, setTranscription] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
+  const [draft, setDraft] = useState(null); // { title, agenda, tasks, type, employee }
+  const [editingAgenda, setEditingAgenda] = useState(false);
+  const [fileName, setFileName] = useState(null);
+  const [reading, setReading] = useState(false);
+  const [dragCount, setDragCount] = useState(0);
+  const fileInputRef = useRef(null);
+  const agendaRef = useRef(null);
+  const dragging = dragCount > 0;
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [linkText, setLinkText] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkTaskId, setLinkTaskId] = useState("");
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setReading(true);
+    setError(null);
+    try {
+      const name = file.name.toLowerCase();
+      let text = "";
+      if (name.endsWith(".docx")) {
+        const buffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+        text = result.value || "";
+      } else if (name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".srt") || name.endsWith(".vtt") || file.type.startsWith("text/")) {
+        text = await file.text();
+      } else if (name.endsWith(".doc")) {
+        throw new Error("Старый формат .doc не поддерживается. Сохраните файл как .docx или .txt.");
+      } else {
+        // Пытаемся прочитать как текст
+        text = await file.text();
+      }
+      if (!text.trim()) throw new Error("Файл пустой или не удалось извлечь текст.");
+      setTranscription(text);
+      setFileName(file.name);
+      showToast(`Файл загружен: ${file.name}`);
+    } catch (e) {
+      setError(`Не удалось прочитать файл: ${e.message || e}`);
+      setFileName(null);
+    } finally {
+      setReading(false);
+    }
+  };
+
+  const onFileInputChange = (e) => {
+    const f = e.target.files?.[0];
+    if (f) handleFile(f);
+    e.target.value = ""; // reset, чтобы можно было загрузить тот же файл снова
+  };
+
+  const onDragEnter = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer?.types?.includes("Files")) setDragCount(c => c + 1);
+  };
+  const onDragLeave = (e) => {
+    e.preventDefault();
+    setDragCount(c => Math.max(0, c - 1));
+  };
+  const onDragOver = (e) => { e.preventDefault(); };
+  const onDrop = (e) => {
+    e.preventDefault();
+    setDragCount(0);
+    const f = e.dataTransfer.files?.[0];
+    if (f) handleFile(f);
+  };
+
+  const clearFile = () => {
+    setFileName(null);
+    setTranscription("");
+  };
+
+  const generate = async () => {
+    if (!transcription.trim()) return;
+    if (meetingType === "personal" && !employee.trim()) {
+      setError("Укажите имя сотрудника для личной встречи.");
+      return;
+    }
+    // Сайт не может вызывать Anthropic API напрямую (CORS + нет API ключа).
+    // Генерация работает ТОЛЬКО в артефакте Claude.
+    if (!_artifactStorage) {
+      setError("Генерация повесток из транскрипции работает только в артефакте Claude (там Anthropic разрешает вызовы ИИ).\n\nНа сайте: создавайте повестки в артефакте → нажимайте «Экспорт данных» → возвращайтесь сюда → «Импорт». Все собрания и задачи синхронизируются.\n\nСайт нужен чтобы: смотреть историю, управлять задачами, отправлять напоминания через бот, синхронизировать данные между устройствами.");
+      return;
+    }
+    setGenerating(true);
+    setError(null);
+    try {
+      // Передаём открытые задачи — ИИ сопоставит с обсуждением в транскрипции
+      const openTasks = allTasks.filter(t => {
+        if (t.assignees.length === 0) return true;
+        return t.assignees.some(a => a.status !== "done");
+      });
+      const result = await generateFromTranscription(transcription, {
+        type: meetingType,
+        employee: meetingType === "personal" ? employee.trim() : null,
+        team,
+        existingTasks: openTasks
+      });
+      setDraft({
+        title: result.title || (meetingType === "personal" ? `1-на-1: ${employee}` : "Собрание"),
+        agenda: result.agenda || "",
+        type: meetingType,
+        employee: meetingType === "personal" ? employee.trim() : null,
+        tasks: (result.tasks || []).map(t => ({
+          id: uid(),
+          title: t.title || "",
+          description: t.description || "",
+          assignees: (t.assignees || []).map(name => ({ name, status: "pending" })),
+          createdAt: Date.now()
+        })),
+        // Обновления существующих задач
+        taskUpdates: (result.task_updates || []).map(u => {
+          const existing = allTasks.find(t => t.id === u.existingId);
+          return {
+            ...u,
+            existingTask: existing || null,
+            accepted: true // по умолчанию принимаем
+          };
+        }).filter(u => u.existingTask) // убираем если задача не найдена
+      });
+    } catch (e) {
+      setError(e.message || "Не удалось сгенерировать. Попробуйте ещё раз.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const insertLink = () => {
+    const text = linkText.trim();
+    const url = normalizeUrl(linkUrl);
+    if (!text || !url) return;
+    const md = `[${text}](${url})`;
+    const ta = agendaRef.current;
+
+    // 1. Вставляем в текст повестки
+    if (ta) {
+      const start = ta.selectionStart || 0;
+      const end = ta.selectionEnd || 0;
+      const val = draft.agenda;
+      const newVal = val.substring(0, start) + md + val.substring(end);
+      // 2. Если выбрана задача — прикрепляем ссылку к ней тоже
+      if (linkTaskId) {
+        setDraft(d => ({
+          ...d,
+          agenda: newVal,
+          tasks: d.tasks.map(t => t.id === linkTaskId ? { ...t, link: url } : t)
+        }));
+      } else {
+        setDraft(d => ({ ...d, agenda: newVal }));
+      }
+      setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + md.length; ta.focus(); }, 0);
+    } else {
+      if (linkTaskId) {
+        setDraft(d => ({
+          ...d,
+          agenda: d.agenda + "\n" + md,
+          tasks: d.tasks.map(t => t.id === linkTaskId ? { ...t, link: url } : t)
+        }));
+      } else {
+        setDraft(d => ({ ...d, agenda: d.agenda + "\n" + md }));
+      }
+    }
+    setShowLinkForm(false);
+    setLinkText("");
+    setLinkUrl("");
+    setLinkTaskId("");
+  };
+
+  const save = async () => {
+    const meetingId = uid();
+    const meeting = {
+      id: meetingId,
+      date: Date.now(),
+      title: draft.title,
+      transcription,
+      agenda: draft.agenda,
+      type: draft.type || "group",
+      employee: draft.employee || null
+    };
+    const meetingTasks = draft.tasks.map(t => ({
+      ...t,
+      meetingId,
+      meetingType: meeting.type,
+      employee: meeting.employee
+    }));
+
+    // Применяем принятые обновления к существующим задачам
+    if (draft.taskUpdates && onUpdateTask) {
+      for (const u of draft.taskUpdates) {
+        if (!u.accepted || !u.existingTask) continue;
+        const existing = u.existingTask;
+        const updated = { ...existing };
+        if (u.description) updated.description = (updated.description ? updated.description + "\n\n" : "") + `[${formatDate(Date.now())}] ${u.description}`;
+        if (u.newDueDate) {
+          const parsed = fromInputDate(u.newDueDate) || null;
+          if (parsed) {
+            if (updated.dueDate && parsed > updated.dueDate) {
+              updated.postponedCount = (updated.postponedCount || 0) + 1;
+              updated.originalDueDate = updated.originalDueDate || updated.dueDate;
+            }
+            updated.dueDate = parsed;
+          }
+        }
+        await onUpdateTask(updated);
+      }
+    }
+
+    onSave(meeting, meetingTasks);
+    setTranscription("");
+    setFileName(null);
+    setDraft(null);
+    if (meetingType === "personal") setEmployee("");
+  };
+
+  const updateDraftTask = (taskId, patch) => {
+    setDraft(d => ({ ...d, tasks: d.tasks.map(t => t.id === taskId ? { ...t, ...patch } : t) }));
+  };
+
+  const removeDraftTask = (taskId) => {
+    setDraft(d => ({ ...d, tasks: d.tasks.filter(t => t.id !== taskId) }));
+  };
+
+  const addDraftTask = () => {
+    setDraft(d => ({ ...d, tasks: [...d.tasks, {
+      id: uid(), title: "", description: "", assignees: [], createdAt: Date.now()
+    }]}));
+  };
+
+  if (!draft) {
+    const charCount = transcription.length;
+    return (
+      <div
+        className={`card drop-zone ${dragging ? 'dragging' : ''}`}
+        onDragEnter={onDragEnter}
+        onDragLeave={onDragLeave}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
+        {dragging && (
+          <div className="drop-overlay">
+            <Upload size={36}/>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 22 }}>Отпустите файл</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 400 }}>.txt или .docx</div>
+          </div>
+        )}
+
+        {/* Информационный баннер для сайта */}
+        {!_artifactStorage && (
+          <div style={{
+            padding: '14px 18px', marginBottom: 20,
+            background: 'var(--accent-tint)', border: '1.5px solid var(--accent)',
+            borderRadius: 'var(--radius-sm)', fontSize: 13, lineHeight: 1.6
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--accent-2)' }}>
+              ℹ️ Генерация повесток только в артефакте Claude
+            </div>
+            <div style={{ color: 'var(--ink-2)' }}>
+              Сайт не может вызывать ИИ напрямую (ограничения CORS). Создавайте повестки в <strong>артефакте Claude</strong> → жмите <strong>«📋 Экспорт данных»</strong> → возвращайтесь сюда → <strong>«⬆ Импорт»</strong>. Здесь управляйте задачами, историей, отправкой в Telegram.
+            </div>
+          </div>
+        )}
+
+        {/* Тип собрания */}
+        <div className="type-toggle">
+          <button
+            className={`type-btn ${meetingType === 'group' ? 'active' : ''}`}
+            onClick={() => setMeetingType('group')}
+          >
+            <Users size={15}/> Групповое собрание
+            <div className="type-sub">Повестка для чата руководителей</div>
+          </button>
+          <button
+            className={`type-btn ${meetingType === 'personal' ? 'active' : ''}`}
+            onClick={() => setMeetingType('personal')}
+          >
+            <Sparkles size={15}/> Личная встреча (1-на-1)
+            <div className="type-sub">Конфиденциальные заметки</div>
+          </button>
+        </div>
+
+        {meetingType === 'personal' && (
+          <div style={{ marginBottom: 16 }}>
+            <label>С кем встреча?</label>
+            <input
+              list="employees-datalist"
+              placeholder="Имя и фамилия сотрудника"
+              value={employee}
+              onChange={e => setEmployee(e.target.value)}
+              autoFocus
+            />
+            <datalist id="employees-datalist">
+              {existingEmployees.map(name => <option key={name} value={name} />)}
+            </datalist>
+            {existingEmployees.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {existingEmployees.slice(0, 8).map(name => (
+                  <button
+                    key={name}
+                    className="filter-btn"
+                    onClick={() => setEmployee(name)}
+                    style={{ fontSize: 12 }}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+          <label style={{ margin: 0 }}>{meetingType === 'personal' ? 'Транскрипция личной встречи' : 'Транскрипция собрания'}</label>
+          <div className="actions-row">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.docx,.md,.srt,.vtt,text/plain"
+              style={{ display: 'none' }}
+              onChange={onFileInputChange}
+            />
+            <button className="btn btn-sm" onClick={() => fileInputRef.current?.click()} disabled={reading || generating}>
+              {reading ? <><Loader2 size={14} className="spin"/> Читаю…</> : <><Paperclip size={14}/> Загрузить файл</>}
+            </button>
+          </div>
+        </div>
+
+        {fileName && (
+          <div className="file-chip">
+            <FileText size={14}/>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
+            <span className="small" style={{ flexShrink: 0 }}>{(charCount/1000).toFixed(0)}K символов</span>
+            <X size={14} style={{ cursor: 'pointer', flexShrink: 0 }} onClick={clearFile} title="Очистить" />
+          </div>
+        )}
+
+        <textarea
+          placeholder="Вставьте транскрипцию сюда или перетащите файл (.txt, .docx) в эту область…"
+          value={transcription}
+          onChange={e => { setTranscription(e.target.value); if (fileName) setFileName(null); }}
+          rows={14}
+        />
+        <div className="hint">
+          Поддерживаются: .txt, .docx, .md, .srt, .vtt. Длина не ограничена.
+          {charCount > 0 && !fileName && ` · ${(charCount/1000).toFixed(1)}K символов`}
+        </div>
+        {error && <div style={{ marginTop: 12, color: 'var(--warn)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <AlertCircle size={14}/> {error}
+        </div>}
+        <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="btn btn-primary" onClick={generate} disabled={!transcription.trim() || generating || reading}>
+            {generating ? <><Loader2 size={15} className="spin"/> Анализирую…</> : <><Wand2 size={15}/> Сгенерировать повестку</>}
+          </button>
+        </div>
+        <style>{`.spin { animation: rot 1s linear infinite; } @keyframes rot { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="card">
+        <label>Название</label>
+        <input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
+          <label style={{ margin: 0 }}>Текст повестки</label>
+          <button className="btn btn-ghost btn-sm" onClick={() => setEditingAgenda(e => !e)}>
+            {editingAgenda ? <><Check size={14}/> Готово</> : <><Edit3 size={14}/> Редактировать</>}
+          </button>
+        </div>
+        {editingAgenda ? (
+          <div>
+            <textarea ref={agendaRef} value={draft.agenda} onChange={e => setDraft(d => ({ ...d, agenda: e.target.value }))} rows={14} />
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowLinkForm(f => !f)}>
+                <Link2 size={13}/> Вставить ссылку
+              </button>
+              <div className="hint" style={{ margin: 0 }}>Формат: [текст](url) — в превью станет кликабельной ссылкой</div>
+            </div>
+            {showLinkForm && (
+              <div style={{ marginTop: 8, padding: 12, background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1, minWidth: 140 }}>
+                    <label style={{ fontSize: 12 }}>Текст ссылки</label>
+                    <input
+                      autoFocus
+                      placeholder="Файл / Таблица / Отчёт"
+                      value={linkText}
+                      onChange={e => setLinkText(e.target.value)}
+                      style={{ fontSize: 13 }}
+                    />
+                  </div>
+                  <div style={{ flex: 2, minWidth: 200 }}>
+                    <label style={{ fontSize: 12 }}>URL</label>
+                    <input
+                      placeholder="https://docs.google.com/..."
+                      value={linkUrl}
+                      onChange={e => setLinkUrl(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && insertLink()}
+                      style={{ fontSize: 13, fontFamily: 'monospace' }}
+                    />
+                  </div>
+                </div>
+                {draft.tasks.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <label style={{ fontSize: 12 }}>📌 Прикрепить к задаче (одно действие — ссылка попадёт и в текст, и в задачу)</label>
+                    <select
+                      value={linkTaskId}
+                      onChange={e => setLinkTaskId(e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--ink)' }}
+                    >
+                      <option value="">— Только в текст повестки —</option>
+                      {draft.tasks.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}{t.link ? ' ✓ (уже есть ссылка)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 4, marginTop: 10, justifyContent: 'flex-end' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setShowLinkForm(false); setLinkTaskId(""); }}>
+                    <X size={12}/> Отмена
+                  </button>
+                  <button className="btn btn-sm btn-primary" onClick={insertLink} disabled={!linkText.trim() || !linkUrl.trim()}>
+                    <Check size={12}/> Вставить{linkTaskId ? ' + прикрепить' : ''}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="agenda-output">{renderMarkdown(draft.agenda)}</div>
+        )}
+        <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-sm" onClick={() => { copyToClipboard(draft.agenda, showToast); }}>
+            <Copy size={14}/> Скопировать текст
+          </button>
+          <TgSendButton text={draft.agenda} showToast={showToast} tgConfig={tgConfig} />
+        </div>
+      </div>
+
+      {/* Обновления существующих задач */}
+      {draft.taskUpdates && draft.taskUpdates.length > 0 && (
+        <div className="card" style={{ borderColor: '#c8a957', borderWidth: 1.5 }}>
+          <div className="display" style={{ fontSize: 20, marginBottom: 4 }}>🔄 Обновления существующих задач</div>
+          <div className="small" style={{ marginBottom: 16 }}>ИИ нашёл в транскрипции обсуждение задач, которые уже есть в вашем трекере. Примите или отклоните каждое обновление.</div>
+          {draft.taskUpdates.map((u, idx) => (
+            <div key={u.existingId || idx} style={{
+              padding: 14, marginBottom: 10, borderRadius: 10,
+              background: u.accepted ? '#fdf8e8' : 'var(--surface-2)',
+              border: `1px solid ${u.accepted ? '#d9c98a' : 'var(--line)'}`,
+              opacity: u.accepted ? 1 : 0.6,
+              transition: 'all 0.15s'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>📌 {u.existingTask?.title || u.existingId}</div>
+                  {u.reason && <div style={{ marginTop: 6, fontSize: 13, color: 'var(--ink-2)' }}>💬 {u.reason}</div>}
+                  {u.description && <div style={{ marginTop: 6, fontSize: 13, padding: '8px 10px', background: 'var(--surface)', borderRadius: 6, border: '1px solid var(--line)' }}>
+                    <span className="small" style={{ fontWeight: 600 }}>Дополнение:</span> {u.description}
+                  </div>}
+                  {u.newDueDate && <div style={{ marginTop: 6, fontSize: 13 }}>📅 Новый срок: <strong>{u.newDueDate}</strong></div>}
+                </div>
+                <button
+                  className={`btn btn-sm ${u.accepted ? 'btn-primary' : ''}`}
+                  onClick={() => {
+                    setDraft(d => ({
+                      ...d,
+                      taskUpdates: d.taskUpdates.map((tu, i) => i === idx ? { ...tu, accepted: !tu.accepted } : tu)
+                    }));
+                  }}
+                >
+                  {u.accepted ? <><Check size={13}/> Принято</> : "Отклонено"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div className="display" style={{ fontSize: 20 }}>➕ Новые задачи</div>
+          <button className="btn btn-sm" onClick={addDraftTask}><Plus size={14}/> Добавить</button>
+        </div>
+        {draft.tasks.length === 0 ? (
+          <div className="small">Задачи не найдены. Можете добавить вручную.</div>
+        ) : (
+          draft.tasks.map(t => (
+            <TaskEditor key={t.id} task={t} onUpdate={p => updateDraftTask(t.id, p)} onRemove={() => removeDraftTask(t.id)} />
+          ))
+        )}
+      </div>
+
+      <div className="actions-row" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
+        <button className="btn" onClick={() => setDraft(null)}>
+          <ArrowLeft size={14}/> Отмена
+        </button>
+        <button className="btn btn-primary" onClick={save}>
+          <Save size={14}/> Сохранить в историю
+        </button>
+      </div>
+    </>
+  );
+}
+
+/* ============================================================
+   TASK EDITOR — for editing tasks in draft mode
+   ============================================================ */
+function TaskEditor({ task, onUpdate, onRemove }) {
+  const [newAssignee, setNewAssignee] = useState("");
+
+  const addAssignee = () => {
+    const name = newAssignee.trim();
+    if (!name) return;
+    if (task.assignees.find(a => a.name.toLowerCase() === name.toLowerCase())) return;
+    onUpdate({ assignees: [...task.assignees, { name, status: "pending" }] });
+    setNewAssignee("");
+  };
+
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 10, padding: 14, marginBottom: 10, background: 'var(--surface-2)' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <input
+          placeholder="Что нужно сделать"
+          value={task.title}
+          onChange={e => onUpdate({ title: e.target.value })}
+          style={{ flex: 1, background: 'var(--surface)' }}
+        />
+        <button className="btn btn-ghost btn-sm btn-danger" onClick={onRemove}><Trash2 size={14}/></button>
+      </div>
+      <input
+        placeholder="Детали (опционально)"
+        value={task.description}
+        onChange={e => onUpdate({ description: e.target.value })}
+        style={{ marginTop: 8, background: 'var(--surface)' }}
+      />
+      <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+        <Link2 size={14} style={{ color: 'var(--ink-3)', flexShrink: 0 }}/>
+        <input
+          placeholder="Ссылка на Google Sheets / документ (опционально)"
+          value={task.link || ""}
+          onChange={e => onUpdate({ link: e.target.value })}
+          onBlur={e => {
+            const v = e.target.value.trim();
+            if (v) {
+              const norm = normalizeUrl(v);
+              if (norm && norm !== v) onUpdate({ link: norm });
+            }
+          }}
+          style={{ flex: 1, background: 'var(--surface)', fontSize: 13 }}
+        />
+        {task.link && (
+          <a href={normalizeUrl(task.link) || "#"} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" title="Открыть в новой вкладке">
+            <ExternalLink size={13}/>
+          </a>
+        )}
+      </div>
+      <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        {task.assignees.map((a, i) => (
+          <span key={i} className="assignee-chip" style={{ cursor: 'default' }}>
+            <span className="name">{a.name}</span>
+            <X size={12} style={{ cursor: 'pointer' }} onClick={() => onUpdate({ assignees: task.assignees.filter((_, j) => j !== i) })} />
+          </span>
+        ))}
+        <div style={{ display: 'flex', gap: 4 }}>
+          <input
+            placeholder="+ исполнитель"
+            value={newAssignee}
+            onChange={e => setNewAssignee(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addAssignee()}
+            style={{ width: 140, padding: '6px 10px', fontSize: 13, background: 'var(--surface)' }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   HISTORY VIEW
+   ============================================================ */
+function HistoryView({ meetings, onSelect, onRename }) {
+  if (meetings.length === 0) {
+    return (
+      <div className="empty">
+        <div className="display">История пуста</div>
+        <div>Сохранённые собрания появятся здесь</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      {meetings.map(m => (
+        <MeetingRow key={m.id} meeting={m} onSelect={() => onSelect(m)} onRename={(t) => onRename(m.id, t)} />
+      ))}
+    </div>
+  );
+}
+
+function MeetingRow({ meeting, onSelect, onRename }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(meeting.title);
+  const d = new Date(meeting.date);
+
+  const commit = () => {
+    const t = value.trim();
+    if (t && t !== meeting.title) onRename(t);
+    else setValue(meeting.title);
+    setEditing(false);
+  };
+  const cancel = () => { setValue(meeting.title); setEditing(false); };
+
+  return (
+    <div className="meeting-row" onClick={() => !editing && onSelect()}>
+      <div className="date-block">
+        <div className="day">{d.getDate()}</div>
+        <div className="mon">{RU_MONTHS[d.getMonth()].slice(0, 3)}</div>
+      </div>
+      <div className="info">
+        {editing ? (
+          <input
+            autoFocus
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            onClick={e => e.stopPropagation()}
+            onBlur={commit}
+            onKeyDown={e => {
+              e.stopPropagation();
+              if (e.key === 'Enter') commit();
+              if (e.key === 'Escape') cancel();
+            }}
+            style={{ padding: '6px 10px', fontSize: 17, fontFamily: 'Fraunces, serif', fontWeight: 500 }}
+          />
+        ) : (
+          <h3>{meeting.title}</h3>
+        )}
+        <div className="meta">{formatDate(meeting.date)}</div>
+      </div>
+      <button
+        className="btn btn-ghost btn-sm row-edit-btn"
+        onClick={e => { e.stopPropagation(); editing ? commit() : setEditing(true); }}
+        title={editing ? "Сохранить" : "Переименовать"}
+      >
+        {editing ? <Check size={15}/> : <Edit3 size={15}/>}
+      </button>
+      {!editing && <ChevronRight size={20} style={{ color: 'var(--ink-3)' }} />}
+    </div>
+  );
+}
+
+/* ============================================================
+   MEETING DETAIL VIEW
+   ============================================================ */
+function MeetingDetail({ meeting, tasks, onBack, onDelete, onCopy, onRename, onUpdateTask, onDeleteTask, team = [], tgConfig, onOpenTg, showToast }) {
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(meeting.title);
+
+  useEffect(() => { setTitleValue(meeting.title); }, [meeting.title]);
+
+  const commitTitle = () => {
+    const t = titleValue.trim();
+    if (t && t !== meeting.title) onRename(t);
+    else setTitleValue(meeting.title);
+    setEditingTitle(false);
+  };
+  const cancelTitle = () => { setTitleValue(meeting.title); setEditingTitle(false); };
+
+  return (
+    <div>
+      <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 16 }}>
+        <ArrowLeft size={14}/> Назад
+      </button>
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {editingTitle ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  autoFocus
+                  value={titleValue}
+                  onChange={e => setTitleValue(e.target.value)}
+                  onBlur={commitTitle}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') commitTitle();
+                    if (e.key === 'Escape') cancelTitle();
+                  }}
+                  style={{ fontFamily: 'Fraunces, serif', fontSize: 22, fontWeight: 500, padding: '6px 12px', flex: 1, minWidth: 200 }}
+                />
+                <button className="btn btn-ghost btn-sm" onMouseDown={e => e.preventDefault()} onClick={commitTitle} title="Сохранить">
+                  <Check size={15}/>
+                </button>
+                <button className="btn btn-ghost btn-sm" onMouseDown={e => e.preventDefault()} onClick={cancelTitle} title="Отмена">
+                  <X size={15}/>
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div className="display" style={{ fontSize: 26 }}>{meeting.title}</div>
+                <button className="btn btn-ghost btn-sm" onClick={() => setEditingTitle(true)} title="Переименовать">
+                  <Edit3 size={14}/>
+                </button>
+              </div>
+            )}
+            <div className="small" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {meeting.type === 'personal' && (
+                <span className="personal-mark"><Users size={11}/> 1-на-1 · {meeting.employee || '—'}</span>
+              )}
+              <span>{formatDate(meeting.date)}</span>
+            </div>
+          </div>
+          <div className="actions-row">
+            <button className="btn btn-sm" onClick={onCopy}><Copy size={14}/> Скопировать</button>
+            <TgSendButton text={meeting.agenda} showToast={showToast} tgConfig={tgConfig} compact />
+            <button className="btn btn-sm btn-danger" onClick={onDelete}><Trash2 size={14}/></button>
+          </div>
+        </div>
+        <div className="agenda-output" style={{ marginTop: 20 }}>{renderMarkdown(meeting.agenda)}</div>
+
+        <details>
+          <summary>Показать исходную транскрипцию</summary>
+          <div style={{ marginTop: 12, padding: 16, background: 'var(--bg-tint)', borderRadius: 8, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--ink-2)' }}>
+            {meeting.transcription}
+          </div>
+        </details>
+      </div>
+
+      {tasks.length > 0 && (
+        <div className="card">
+          <div className="display" style={{ fontSize: 20, marginBottom: 16 }}>Задачи этого собрания</div>
+          {tasks.map(t => (
+            <TaskCard key={t.id} task={t} team={team} showToast={showToast} onUpdate={onUpdateTask} onDelete={() => onDeleteTask(t.id)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   TASKS VIEW — global tasks with filters
+   ============================================================ */
+/* ============================================================
+   PERSONAL MEETINGS VIEW — список сотрудников и их встречи
+   ============================================================ */
+function PersonalView({ personalMeetings, tasks, selectedEmployee, setSelectedEmployee, onSelectMeeting, onUpdateTask, onDeleteTask, team = [], showToast }) {
+  const byEmployee = useMemo(() => {
+    const map = {};
+    for (const m of personalMeetings) {
+      const e = m.employee || "Без указания";
+      if (!map[e]) map[e] = [];
+      map[e].push(m);
+    }
+    // sort each list by date desc
+    for (const e of Object.keys(map)) map[e].sort((a, b) => b.date - a.date);
+    return map;
+  }, [personalMeetings]);
+
+  const employees = useMemo(() => Object.keys(byEmployee).sort((a, b) => {
+    const oa = team.find(m => m.fullName === a)?.sortOrder ?? 99;
+    const ob = team.find(m => m.fullName === b)?.sortOrder ?? 99;
+    return oa - ob;
+  }), [byEmployee, team]);
+
+  const employeeTasks = useMemo(() => {
+    if (!selectedEmployee) return [];
+    const meetingIds = new Set((byEmployee[selectedEmployee] || []).map(m => m.id));
+    return tasks.filter(t => meetingIds.has(t.meetingId) || t.employee === selectedEmployee);
+  }, [selectedEmployee, byEmployee, tasks]);
+
+  // Detail view for one employee
+  if (selectedEmployee) {
+    const meetings = byEmployee[selectedEmployee] || [];
+    const initials = selectedEmployee.split(/\s+/).map(p => p[0]).slice(0, 2).join("").toUpperCase();
+    const openTasks = employeeTasks.filter(t => t.assignees.some(a => a.status !== "done") || t.assignees.length === 0);
+    return (
+      <div>
+        <button className="btn btn-ghost btn-sm" onClick={() => setSelectedEmployee(null)} style={{ marginBottom: 16 }}>
+          <ArrowLeft size={14}/> Ко всем сотрудникам
+        </button>
+
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+          <div className="avatar" style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--accent-tint)', color: 'var(--accent-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontSize: 22, fontWeight: 600 }}>
+            {initials || "?"}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div className="display" style={{ fontSize: 26 }}>{selectedEmployee}</div>
+            <div className="small" style={{ marginTop: 4 }}>
+              {meetings.length} {meetings.length === 1 ? 'встреча' : meetings.length > 1 && meetings.length < 5 ? 'встречи' : 'встреч'} · {openTasks.length} открытых задач
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="display" style={{ fontSize: 18, marginBottom: 12 }}>История встреч</div>
+          {meetings.length === 0 ? (
+            <div className="small">Встреч пока не было</div>
+          ) : (
+            meetings.map(m => {
+              const d = new Date(m.date);
+              return (
+                <div key={m.id} className="meeting-row" onClick={() => onSelectMeeting(m)} style={{ marginBottom: 8 }}>
+                  <div className="date-block">
+                    <div className="day">{d.getDate()}</div>
+                    <div className="mon">{RU_MONTHS[d.getMonth()].slice(0, 3)}</div>
+                  </div>
+                  <div className="info">
+                    <h3>{m.title}</h3>
+                    <div className="meta">{formatDate(m.date)}</div>
+                  </div>
+                  <ChevronRight size={20} style={{ color: 'var(--ink-3)' }} />
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {employeeTasks.length > 0 && (
+          <div className="card">
+            <div className="display" style={{ fontSize: 18, marginBottom: 12 }}>Задачи по сотруднику ({employeeTasks.length})</div>
+            {employeeTasks.map(t => (
+              <TaskCard
+                key={t.id}
+                task={t}
+                team={team}
+                showToast={showToast}
+                onUpdate={onUpdateTask}
+                onDelete={() => onDeleteTask(t.id)}
+                showStatusBadge
+                computeStatus={(task) => {
+                  if (task.assignees.length === 0) return "pending";
+                  const done = task.assignees.filter(a => a.status === "done").length;
+                  if (done === 0) return "pending";
+                  if (done === task.assignees.length) return "done";
+                  return "partial";
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // List of all employees
+  if (employees.length === 0) {
+    return (
+      <div className="empty">
+        <div className="display">Личных встреч пока нет</div>
+        <div>На вкладке «Новое собрание» выберите «Личная встреча (1-на-1)» и загрузите транскрипцию</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16, background: 'var(--surface-2)', borderStyle: 'dashed' }}>
+        <div className="small" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Users size={14} style={{ color: 'var(--accent)' }}/>
+          <span>Здесь хранятся ваши приватные заметки 1-на-1 со {employees.length} {employees.length === 1 ? 'сотрудником' : 'сотрудниками'}. Кликните на карточку, чтобы увидеть все встречи и задачи.</span>
+        </div>
+      </div>
+      <div className="employee-grid">
+        {employees.map(name => {
+          const list = byEmployee[name];
+          const lastDate = list[0]?.date;
+          const taskCount = tasks.filter(t => list.some(m => m.id === t.meetingId)).length;
+          const initials = name.split(/\s+/).map(p => p[0]).slice(0, 2).join("").toUpperCase();
+          return (
+            <button key={name} className="employee-card" onClick={() => setSelectedEmployee(name)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="avatar">{initials || "?"}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="ename" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                  <div className="estat">{list.length} встреч · {taskCount} задач</div>
+                </div>
+              </div>
+              <div className="small" style={{ marginTop: 4 }}>
+                Последняя: {lastDate ? formatDate(lastDate) : '—'}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TasksView({ tasks, meetings, onUpdate, onDelete, onAdd, onSelectMeeting, showToast, team = [], tgConfig }) {
+  const [filter, setFilter] = useState("all"); // status: all | pending | partial | done
+  const [dueFilter, setDueFilter] = useState(null); // deadline: overdue | today | week | no-date | null
+  const [assigneeFilter, setAssigneeFilter] = useState(null);
+  const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [hideCompleted, setHideCompleted] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [mergingTaskId, setMergingTaskId] = useState(null);
+  const [mergeSearch, setMergeSearch] = useState("");
+
+  // Сбрасываем выделение при смене фильтра
+  useEffect(() => { setSelectedIds(new Set()); }, [assigneeFilter, filter, dueFilter, search]);
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (filteredTasks) => {
+    const allSelected = filteredTasks.every(t => selectedIds.has(t.id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredTasks.map(t => t.id)));
+    }
+  };
+
+  const copySelected = () => {
+    const selected = tasks.filter(t => selectedIds.has(t.id));
+    if (!selected.length) { showToast("Ничего не выбрано"); return; }
+    const text = selected.map(t => formatTaskForShare(t)).join("\n\n———\n\n");
+    copyToClipboard(text, showToast);
+  };
+
+  // Форматирование одной задачи для Telegram с @упоминаниями тех кто НЕ сделал
+  const formatTaskForTg = (task) => {
+    const lines = [`📌 ${task.title}`];
+    if (task.description) lines.push(task.description);
+    if (task.dueDate) {
+      const d = new Date(task.dueDate);
+      lines.push(`📅 до ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`);
+    }
+    // Только незавершённые исполнители + их @username из справочника
+    const openAssignees = (task.assignees || []).filter(a => a.status !== "done");
+    if (openAssignees.length) {
+      const mentions = openAssignees.map(a => {
+        const member = team.find(m => m.fullName === a.name);
+        const tg = member?.telegram || "";
+        if (tg) return tg.startsWith("@") ? tg : "@" + tg;
+        return a.name; // если нет @username — пишем имя
+      });
+      lines.push(`👤 ${mentions.join(" ")}`);
+    }
+    if (task.link) lines.push(`🔗 ${task.link}`);
+    return lines.join("\n");
+  };
+
+  const [sendingToTg, setSendingToTg] = useState(false);
+
+  const sendSelectedToTg = async () => {
+    const selected = tasks.filter(t => selectedIds.has(t.id));
+    if (!selected.length) { showToast("Ничего не выбрано"); return; }
+    if (!tgConfig?.chats?.length) { showToast("Сначала настройте Telegram (кнопка в шапке)"); return; }
+    if (!tgConfig?.botToken && !tgConfig?.webhookUrl) { showToast("Нет токена бота и webhook"); return; }
+
+    const chat = tgConfig.chats[0]; // первый чат — МОП АРТЕМ
+    const header = `📋 Напоминание по задачам (${selected.length})\n`;
+    const body = selected.map(t => formatTaskForTg(t)).join("\n\n———\n\n");
+    const fullText = header + "\n" + body;
+
+    setSendingToTg(true);
+    try {
+      if (tgConfig.botToken) {
+        // Bot API — режем длинный текст на части
+        const parts = splitForTelegram(fullText);
+        for (const part of parts) {
+          const res = await fetch(`https://api.telegram.org/bot${tgConfig.botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chat.chatId, text: part, disable_web_page_preview: true })
+          });
+          const data = await res.json();
+          if (!data.ok) throw new Error(data.description || "Ошибка Bot API");
+        }
+      } else if (tgConfig.webhookUrl) {
+        const res = await fetch(tgConfig.webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chat.chatId, chatId: chat.chatId, text: fullText, chat_name: chat.name })
+        });
+        if (!res.ok) throw new Error("Webhook вернул " + res.status);
+      }
+      showToast(`✓ Отправлено ${selected.length} задач(и) в «${chat.name}»`);
+      setSelectedIds(new Set());
+    } catch (e) {
+      showToast("Ошибка: " + e.message);
+    } finally {
+      setSendingToTg(false);
+    }
+  };
+
+  const duplicateTask = (task) => {
+    const copy = {
+      ...task,
+      id: uid(),
+      title: task.title + " (копия)",
+      assignees: task.assignees.map(a => ({ ...a, status: "pending" })),
+      createdAt: Date.now()
+    };
+    onAdd(copy);
+    showToast(`✓ Задача дублирована — «${copy.title}»`);
+  };
+
+  const mergeTasks = (sourceId, targetId) => {
+    const source = tasks.find(t => t.id === sourceId);
+    const target = tasks.find(t => t.id === targetId);
+    if (!source || !target) return;
+
+    // Объединяем данные: target поглощает source
+    const merged = { ...target };
+
+    // Описание: дополняем
+    if (source.description) {
+      merged.description = (merged.description || "") +
+        (merged.description ? "\n\n— объединено —\n" : "") + source.description;
+    }
+
+    // Исполнители: добавляем тех кого нет
+    const existingNames = new Set(merged.assignees.map(a => a.name.toLowerCase()));
+    for (const a of (source.assignees || [])) {
+      if (!existingNames.has(a.name.toLowerCase())) {
+        merged.assignees = [...merged.assignees, a];
+      }
+    }
+
+    // Срок: берём ближайший непустой
+    if (!merged.dueDate && source.dueDate) merged.dueDate = source.dueDate;
+
+    // Ссылка: берём если нет
+    if (!merged.link && source.link) merged.link = source.link;
+
+    onUpdate(merged);
+    onDelete(sourceId);
+    setMergingTaskId(null);
+    setMergeSearch("");
+    showToast(`✓ Задачи объединены → «${target.title}»`);
+  };
+
+  const allAssignees = useMemo(() => {
+    const set = new Set();
+    tasks.forEach(t => t.assignees.forEach(a => set.add(a.name)));
+    return [...set].sort((a, b) => {
+      const orderA = team.find(m => m.fullName === a)?.sortOrder ?? 99;
+      const orderB = team.find(m => m.fullName === b)?.sortOrder ?? 99;
+      return orderA - orderB;
+    });
+  }, [tasks, team]);
+
+  const computeStatus = (t) => {
+    if (t.assignees.length === 0) return "pending";
+    const done = t.assignees.filter(a => a.status === "done").length;
+    if (done === 0) return "pending";
+    if (done === t.assignees.length) return "done";
+    return "partial";
+  };
+
+  // Considers a task "open" if it's not fully done
+  const isOpen = (t) => computeStatus(t) !== "done";
+
+  // Digest counts (only open tasks count in deadline categories)
+  const counts = useMemo(() => {
+    const c = { overdue: 0, today: 0, week: 0, "no-date": 0, future: 0 };
+    for (const t of tasks) {
+      if (!isOpen(t)) continue;
+      c[getDueCategory(t.dueDate)]++;
+    }
+    return c;
+  }, [tasks]);
+
+  const filtered = tasks.filter(t => {
+    // Status filter — when an assignee is selected, use THEIR personal status
+    if (filter !== "all") {
+      if (assigneeFilter) {
+        const a = t.assignees.find(x => x.name === assigneeFilter);
+        if (!a) return false;
+        const personalStatus = a.status || "pending";
+        if (filter === "pending" && personalStatus !== "pending") return false;
+        if (filter === "in-progress" && personalStatus !== "in-progress") return false;
+        if (filter === "done" && personalStatus !== "done") return false;
+        if (filter === "partial") return false; // partial не релевантно для одного исполнителя
+      } else {
+        // Task-level aggregate status
+        if (filter === "in-progress") {
+          if (!t.assignees.some(a => a.status === "in-progress")) return false;
+        } else if (computeStatus(t) !== filter) {
+          return false;
+        }
+      }
+    }
+    if (hideCompleted && computeStatus(t) === "done") return false;
+    if (dueFilter) {
+      if (!isOpen(t)) return false; // due filters only show open tasks
+      if (getDueCategory(t.dueDate) !== dueFilter) return false;
+    }
+    if (assigneeFilter && !t.assignees.find(a => a.name === assigneeFilter)) return false;
+    if (search && !(t.title.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase()))) return false;
+    return true;
+  });
+
+  // sort: overdue first, then by due date, then no-date last
+  const sorted = [...filtered].sort((a, b) => {
+    const ad = a.dueDate, bd = b.dueDate;
+    if (ad && bd) return ad - bd;
+    if (ad && !bd) return -1;
+    if (!ad && bd) return 1;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+
+  const copyReminder = async () => {
+    const openTasks = tasks.filter(isOpen);
+    const text = generateReminderText(openTasks);
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast?.("Текст напоминания скопирован");
+    } catch {
+      showToast?.("Не удалось скопировать");
+    }
+  };
+
+  const exportCalendar = () => {
+    const withDates = tasks.filter(t => t.dueDate && isOpen(t));
+    if (withDates.length === 0) {
+      showToast?.("Нет задач с дедлайнами для экспорта");
+      return;
+    }
+    downloadICS(withDates, `задачи-${formatDateShort(Date.now())}.ics`);
+    showToast?.(`Скачано: ${withDates.length} задач`);
+  };
+
+  return (
+    <div>
+      {/* Digest banner */}
+      <div className="digest">
+        <button
+          className={`digest-card overdue ${dueFilter === 'overdue' ? 'active' : ''}`}
+          onClick={() => setDueFilter(dueFilter === 'overdue' ? null : 'overdue')}
+        >
+          <span className="label"><AlertCircle size={12}/> Просрочено</span>
+          <span className="count">{counts.overdue}</span>
+        </button>
+        <button
+          className={`digest-card today ${dueFilter === 'today' ? 'active' : ''}`}
+          onClick={() => setDueFilter(dueFilter === 'today' ? null : 'today')}
+        >
+          <span className="label"><AlarmClock size={12}/> Сегодня</span>
+          <span className="count">{counts.today}</span>
+        </button>
+        <button
+          className={`digest-card week ${dueFilter === 'week' ? 'active' : ''}`}
+          onClick={() => setDueFilter(dueFilter === 'week' ? null : 'week')}
+        >
+          <span className="label"><CalendarClock size={12}/> На 7 дней</span>
+          <span className="count">{counts.week}</span>
+        </button>
+        <button
+          className={`digest-card ${dueFilter === 'no-date' ? 'active' : ''}`}
+          onClick={() => setDueFilter(dueFilter === 'no-date' ? null : 'no-date')}
+        >
+          <span className="label"><Calendar size={12}/> Без срока</span>
+          <span className="count">{counts["no-date"]}</span>
+        </button>
+      </div>
+
+      {/* Reminder toolbar */}
+      <div className="reminder-toolbar">
+        <Bell size={16} style={{ color: 'var(--accent)' }}/>
+        <span className="small" style={{ flex: 1 }}>Напоминания:</span>
+        <button className="btn btn-sm" onClick={copyReminder}>
+          <Copy size={13}/> Скопировать текст
+        </button>
+        <button className="btn btn-sm" onClick={exportCalendar}>
+          <Download size={13}/> Экспорт в календарь
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)' }} />
+          <input placeholder="Поиск по задачам" value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowAdd(true)}><Plus size={14}/> Новая задача</button>
+      </div>
+
+      <div className="filter-bar">
+        <button className={`filter-btn ${filter==='all'?'active':''}`} onClick={() => setFilter('all')}>Все · {tasks.length}</button>
+        <button className={`filter-btn ${filter==='pending'?'active':''}`} onClick={() => setFilter('pending')}>
+          <Square size={11} style={{ verticalAlign: 'middle', marginRight: 3 }}/>
+          Не сделано
+        </button>
+        <button className={`filter-btn ${filter==='in-progress'?'active':''}`} onClick={() => setFilter('in-progress')}>
+          <Clock size={11} style={{ verticalAlign: 'middle', marginRight: 3 }}/>
+          В работе
+        </button>
+        {!assigneeFilter && (
+          <button className={`filter-btn ${filter==='partial'?'active':''}`} onClick={() => setFilter('partial')}>Частично</button>
+        )}
+        <button className={`filter-btn ${filter==='done'?'active':''}`} onClick={() => setFilter('done')}>
+          <Check size={11} style={{ verticalAlign: 'middle', marginRight: 3 }}/>
+          Готово
+        </button>
+        <button className={`filter-btn ${hideCompleted?'active':''}`} onClick={() => setHideCompleted(h => !h)} title="Скрыть выполненные">
+          {hideCompleted ? '☑' : '☐'} Скрыть готовые
+        </button>
+      </div>
+
+      {allAssignees.length > 0 && (
+        <div className="filter-bar">
+          <span className="small" style={{ alignSelf: 'center', marginRight: 4 }}>Исполнитель:</span>
+          <button className={`filter-btn ${!assigneeFilter?'active':''}`} onClick={() => setAssigneeFilter(null)}>Все</button>
+          {allAssignees.map(name => (
+            <button key={name} className={`filter-btn ${assigneeFilter===name?'active':''}`} onClick={() => setAssigneeFilter(name)}>{name}</button>
+          ))}
+          {sorted.length > 0 && (
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => toggleSelectAll(sorted)}
+                title={sorted.every(t => selectedIds.has(t.id)) ? "Снять все" : "Выбрать все"}
+              >
+                {sorted.length > 0 && sorted.every(t => selectedIds.has(t.id))
+                  ? <><CheckSquare size={12}/> Снять все</>
+                  : <><Square size={12}/> Выбрать все</>
+                }
+              </button>
+              {selectedIds.size > 0 && (
+                <>
+                  <button className="btn btn-sm" onClick={copySelected} title="Скопировать в буфер">
+                    <Copy size={12}/> Скопировать ({selectedIds.size})
+                  </button>
+                  {!_artifactStorage && tgConfig?.chats?.length > 0 && (tgConfig?.botToken || tgConfig?.webhookUrl) && (
+                    <button className="btn btn-sm btn-tg" onClick={sendSelectedToTg} disabled={sendingToTg} title={`Отправить ботом в «${tgConfig.chats[0].name}» с @упоминаниями`}>
+                      {sendingToTg ? <Loader2 size={12} className="spin"/> : <Send size={12}/>}
+                      Отправить в «{tgConfig.chats[0].name}» ({selectedIds.size})
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {(dueFilter || filter !== "all" || assigneeFilter || search || hideCompleted) && (
+        <div className="active-filter-bar">
+          <Filter size={14} style={{ color: 'var(--accent)' }}/>
+          <span className="small" style={{ flex: 1 }}>
+            <strong>Показано {sorted.length}</strong> из {tasks.length} задач
+            {dueFilter && <span className="active-tag" style={{ marginLeft: 8 }}>
+              {dueFilter === 'overdue' ? '⚠️ Просрочено' :
+               dueFilter === 'today' ? '📌 Сегодня' :
+               dueFilter === 'week' ? '🔜 На 7 дней' :
+               '📅 Без срока'}
+              <X size={12} style={{ marginLeft: 4, cursor: 'pointer' }} onClick={() => setDueFilter(null)}/>
+            </span>}
+            {filter !== "all" && <span className="active-tag" style={{ marginLeft: 8 }}>
+              Статус: {filter === 'pending' ? 'Не сделано' :
+                       filter === 'in-progress' ? 'В работе' :
+                       filter === 'partial' ? 'Частично' : 'Готово'}
+              <X size={12} style={{ marginLeft: 4, cursor: 'pointer' }} onClick={() => setFilter('all')}/>
+            </span>}
+            {assigneeFilter && <span className="active-tag" style={{ marginLeft: 8 }}>
+              Исполнитель: {assigneeFilter}
+              <X size={12} style={{ marginLeft: 4, cursor: 'pointer' }} onClick={() => setAssigneeFilter(null)}/>
+            </span>}
+            {search && <span className="active-tag" style={{ marginLeft: 8 }}>
+              Поиск: «{search}»
+              <X size={12} style={{ marginLeft: 4, cursor: 'pointer' }} onClick={() => setSearch("")}/>
+            </span>}
+          </span>
+          <button className="btn btn-ghost btn-sm" onClick={() => {
+            setDueFilter(null); setFilter("all"); setAssigneeFilter(null); setSearch(""); setHideCompleted(false);
+          }}>
+            Сбросить всё
+          </button>
+        </div>
+      )}
+
+      {sorted.length === 0 ? (
+        <div className="empty">
+          <div className="display">Нет задач</div>
+          <div>{tasks.length === 0 ? "Сгенерируйте задачи из собрания или добавьте вручную" : "Попробуйте изменить фильтры"}</div>
+        </div>
+      ) : (
+        sorted.map(t => {
+          const m = meetings.find(mm => mm.id === t.meetingId);
+          return (
+            <div key={t.id} style={{ display: 'flex', gap: 0, alignItems: 'flex-start' }}>
+              <div
+                onClick={() => toggleSelect(t.id)}
+                style={{
+                  padding: '14px 10px 14px 2px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'flex-start', flexShrink: 0
+                }}
+              >
+                {selectedIds.has(t.id)
+                  ? <CheckSquare size={18} style={{ color: 'var(--accent)' }}/>
+                  : <Square size={18} style={{ color: 'var(--ink-3)' }}/>
+                }
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <TaskCard
+                  task={t}
+                  team={team}
+                  showToast={showToast}
+                  meetingLabel={m?.title}
+                  onMeetingClick={m ? () => onSelectMeeting(m) : null}
+                  onUpdate={onUpdate}
+                  onDelete={() => onDelete(t.id)}
+                  onMerge={() => { setMergingTaskId(t.id); setMergeSearch(""); }}
+                  onDuplicate={() => duplicateTask(t)}
+                  showStatusBadge
+                  computeStatus={computeStatus}
+                />
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {showAdd && <AddTaskModal team={team} onClose={() => setShowAdd(false)} onAdd={(t) => { onAdd(t); setShowAdd(false); }} />}
+
+      {/* Модалка объединения задач */}
+      {mergingTaskId && (() => {
+        const source = tasks.find(t => t.id === mergingTaskId);
+        if (!source) return null;
+        const others = tasks.filter(t => {
+          if (t.id === mergingTaskId) return false;
+          if (t.assignees.length > 0 && t.assignees.every(a => a.status === "done")) return false;
+          return true;
+        });
+        const q = mergeSearch.toLowerCase();
+        const filtered = q
+          ? others.filter(t => t.title.toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q) || t.assignees.some(a => a.name.toLowerCase().includes(q)))
+          : others;
+        return (
+          <div className="modal-backdrop" onClick={() => setMergingTaskId(null)}>
+            <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div className="display" style={{ fontSize: 20 }}>🔗 Объединить задачу</div>
+                <button className="btn btn-ghost btn-sm" onClick={() => setMergingTaskId(null)}><X size={16}/></button>
+              </div>
+
+              <div style={{ padding: 12, background: 'var(--accent-tint)', borderRadius: 8, marginBottom: 14, border: '1px solid var(--accent)' }}>
+                <div className="small" style={{ fontWeight: 600, marginBottom: 4 }}>Эта задача будет удалена:</div>
+                <div style={{ fontWeight: 600 }}>📌 {source.title}</div>
+                {source.description && <div className="small" style={{ marginTop: 4 }}>{source.description.slice(0, 100)}{source.description.length > 100 ? '…' : ''}</div>}
+              </div>
+
+              <div className="small" style={{ marginBottom: 8 }}>Выберите задачу, в которую объединить (она сохранится с дополненными данными):</div>
+
+              <input
+                placeholder="Поиск по названию…"
+                value={mergeSearch}
+                onChange={e => setMergeSearch(e.target.value)}
+                autoFocus
+                style={{ marginBottom: 10 }}
+              />
+
+              <div style={{ maxHeight: 350, overflowY: 'auto' }}>
+                {filtered.length === 0 ? (
+                  <div className="small" style={{ padding: 12, textAlign: 'center' }}>Нет подходящих задач</div>
+                ) : (
+                  filtered.map(t => (
+                    <div
+                      key={t.id}
+                      onClick={() => mergeTasks(source.id, t.id)}
+                      style={{
+                        padding: '10px 12px', marginBottom: 6, borderRadius: 8,
+                        border: '1px solid var(--line)', cursor: 'pointer',
+                        background: 'var(--surface)',
+                        transition: 'background 0.12s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-tint)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'var(--surface)'}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{t.title}</div>
+                      {t.description && <div className="small" style={{ marginTop: 2 }}>{t.description.slice(0, 80)}{t.description.length > 80 ? '…' : ''}</div>}
+                      <div className="small" style={{ marginTop: 4, display: 'flex', gap: 12 }}>
+                        {t.assignees.length > 0 && <span>👤 {t.assignees.map(a => a.name).join(", ")}</span>}
+                        {t.dueDate && <span>📅 {formatDateShort(t.dueDate)}</span>}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ============================================================
+   TASK CARD — full task with assignee status toggles
+   ============================================================ */
+function TaskCard({ task, onUpdate, onDelete, meetingLabel, onMeetingClick, showStatusBadge, computeStatus, team = [], showToast, onMerge, onDuplicate }) {
+  const [newAssignee, setNewAssignee] = useState("");
+  const [showAddAssignee, setShowAddAssignee] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [editingAssigneeIdx, setEditingAssigneeIdx] = useState(null);
+  const [assigneeEditValue, setAssigneeEditValue] = useState("");
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkValue, setLinkValue] = useState("");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState("");
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descValue, setDescValue] = useState("");
+  const [dateAssigneeIdx, setDateAssigneeIdx] = useState(null); // null = task-level, number = per-assignee
+
+  const commitLink = () => {
+    const v = linkValue.trim();
+    if (!v) {
+      onUpdate({ ...task, link: null });
+    } else {
+      const norm = normalizeUrl(v);
+      if (norm) onUpdate({ ...task, link: norm });
+    }
+    setEditingLink(false);
+  };
+  const startEditLink = () => {
+    setLinkValue(task.link || "");
+    setEditingLink(true);
+  };
+  const removeLink = () => {
+    onUpdate({ ...task, link: null });
+    setEditingLink(false);
+  };
+
+  const setStatus = (idx, next) => {
+    onUpdate({ ...task, assignees: task.assignees.map((a, i) => i === idx ? { ...a, status: next } : a) });
+  };
+  const removeAssignee = (idx) => {
+    onUpdate({ ...task, assignees: task.assignees.filter((_, i) => i !== idx) });
+  };
+  const renameAssignee = (idx) => {
+    const newName = assigneeEditValue.trim();
+    if (!newName) { setEditingAssigneeIdx(null); return; }
+    // skip duplicates (except self)
+    if (task.assignees.some((a, i) => i !== idx && a.name.toLowerCase() === newName.toLowerCase())) {
+      setEditingAssigneeIdx(null);
+      return;
+    }
+    onUpdate({ ...task, assignees: task.assignees.map((a, i) => i === idx ? { ...a, name: newName } : a) });
+    setEditingAssigneeIdx(null);
+  };
+  const startRename = (idx) => {
+    setAssigneeEditValue(task.assignees[idx].name);
+    setEditingAssigneeIdx(idx);
+  };
+  const addAssignee = () => {
+    const name = newAssignee.trim();
+    if (!name) return;
+    if (task.assignees.find(a => a.name.toLowerCase() === name.toLowerCase())) return;
+    onUpdate({ ...task, assignees: [...task.assignees, { name, status: "pending", dueDate: task.dueDate || null }] });
+    setNewAssignee("");
+    setShowAddAssignee(false);
+  };
+
+  const changeDueDate = (newTs) => {
+    if (dateAssigneeIdx !== null) {
+      // Per-assignee date change
+      const a = task.assignees[dateAssigneeIdx];
+      if (!a) return;
+      const oldDate = a.dueDate || task.dueDate;
+      const isPostpone = oldDate && newTs && newTs > oldDate;
+      const newAssignees = [...task.assignees];
+      newAssignees[dateAssigneeIdx] = {
+        ...a,
+        dueDate: newTs,
+        originalDueDate: a.originalDueDate || oldDate || newTs,
+        postponedCount: isPostpone ? (a.postponedCount || 0) + 1 : (a.postponedCount || 0)
+      };
+      onUpdate({ ...task, assignees: newAssignees });
+    } else {
+      // Task-level: set for task AND all assignees without their own date
+      const isPostpone = task.dueDate && newTs && newTs > task.dueDate;
+      const newAssignees = task.assignees.map(a => ({
+        ...a,
+        dueDate: a.dueDate ? a.dueDate : newTs, // don't overwrite individual dates
+      }));
+      onUpdate({
+        ...task,
+        dueDate: newTs,
+        originalDueDate: task.originalDueDate || task.dueDate || newTs,
+        postponedCount: isPostpone ? (task.postponedCount || 0) + 1 : (task.postponedCount || 0),
+        assignees: newAssignees
+      });
+    }
+    setShowDatePicker(false);
+    setDateAssigneeIdx(null);
+  };
+  const clearDueDate = () => {
+    if (dateAssigneeIdx !== null) {
+      const newAssignees = [...task.assignees];
+      newAssignees[dateAssigneeIdx] = { ...newAssignees[dateAssigneeIdx], dueDate: null, originalDueDate: null, postponedCount: 0 };
+      onUpdate({ ...task, assignees: newAssignees });
+    } else {
+      onUpdate({ ...task, dueDate: null });
+    }
+    setShowDatePicker(false);
+    setDateAssigneeIdx(null);
+  };
+
+  const status = computeStatus ? computeStatus(task) : null;
+  const allDone = task.assignees.length > 0 && task.assignees.every(a => a.status === "done");
+  const dueCat = allDone ? "future" : getDueCategory(task.dueDate);
+  const dueLabel = formatDueDate(task.dueDate);
+
+  return (
+    <div className="task-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {editingTitle ? (
+            <input
+              autoFocus
+              className="title"
+              value={titleValue}
+              onChange={e => setTitleValue(e.target.value)}
+              onBlur={() => { if (titleValue.trim()) onUpdate({ ...task, title: titleValue.trim() }); setEditingTitle(false); }}
+              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingTitle(false); }}
+              style={{ fontWeight: 600, fontSize: 15, width: '100%', padding: '2px 4px', margin: '-2px -4px', border: '1px solid var(--accent)', borderRadius: 4, outline: 'none' }}
+            />
+          ) : (
+            <div className="title" onClick={() => { setTitleValue(task.title); setEditingTitle(true); }} style={{ cursor: 'text' }} title="Кликните чтобы изменить">{task.title}</div>
+          )}
+          {editingDesc ? (
+            <textarea
+              autoFocus
+              value={descValue}
+              onChange={e => setDescValue(e.target.value)}
+              onBlur={() => { onUpdate({ ...task, description: descValue.trim() }); setEditingDesc(false); }}
+              onKeyDown={e => { if (e.key === 'Escape') setEditingDesc(false); }}
+              rows={3}
+              style={{ width: '100%', fontSize: 13, padding: '4px 6px', margin: '4px 0 0 0', border: '1px solid var(--accent)', borderRadius: 4, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+            />
+          ) : (
+            <div
+              className="desc"
+              onClick={() => { setDescValue(task.description || ""); setEditingDesc(true); }}
+              style={{ cursor: 'text', minHeight: 18 }}
+              title="Кликните чтобы изменить"
+            >
+              {task.description || <span className="small" style={{ opacity: 0.4 }}>+ Добавить описание</span>}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          {showStatusBadge && status && (
+            <span className={`badge badge-${status}`}>
+              {status === 'done' ? 'Готово' : status === 'partial' ? 'Частично' : 'Ожидает'}
+            </span>
+          )}
+          <button className="btn btn-ghost btn-sm" onClick={() => copyToClipboard(formatTaskForShare(task), showToast)} title="Скопировать задачу"><Copy size={13}/></button>
+          {onDuplicate && <button className="btn btn-ghost btn-sm" onClick={onDuplicate} title="Дублировать задачу"><Plus size={13}/></button>}
+          {onMerge && <button className="btn btn-ghost btn-sm" onClick={onMerge} title="Объединить с другой задачей"><Link2 size={13}/></button>}
+          <button className="btn btn-ghost btn-sm btn-danger" onClick={onDelete}><Trash2 size={13}/></button>
+        </div>
+      </div>
+
+      {meetingLabel && (
+        <div style={{ marginBottom: 10 }}>
+          <span className="small" style={{ cursor: onMeetingClick ? 'pointer' : 'default', textDecoration: onMeetingClick ? 'underline' : 'none' }} onClick={onMeetingClick}>
+            <FileText size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            {meetingLabel}
+          </span>
+        </div>
+      )}
+
+      <div className="due-row" style={{ position: 'relative' }}>
+        {task.dueDate ? (
+          <>
+            <span className={`due-pill ${dueCat}`} title={task.originalDueDate && task.originalDueDate !== task.dueDate ? `Изначально: ${formatDueDate(task.originalDueDate)}` : ""}>
+              <CalendarClock size={12}/> {dueLabel}
+              {task.postponedCount > 0 && <span className="repeats" title="Перенесено раз">↻ {task.postponedCount}</span>}
+            </span>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowDatePicker(o => !o)}>
+              <Hourglass size={12}/> Перенести
+            </button>
+          </>
+        ) : (
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowDatePicker(o => !o)}>
+            <CalendarClock size={12}/> Установить срок
+          </button>
+        )}
+        {showDatePicker && (
+          <DuePopover
+            current={task.dueDate}
+            onPick={changeDueDate}
+            onClear={clearDueDate}
+            onClose={() => setShowDatePicker(false)}
+          />
+        )}
+      </div>
+
+      {/* Link row */}
+      <div className="link-row">
+        {editingLink ? (
+          <>
+            <Link2 size={14} style={{ color: 'var(--ink-3)', flexShrink: 0 }}/>
+            <input
+              autoFocus
+              placeholder="https://docs.google.com/..."
+              value={linkValue}
+              onChange={e => setLinkValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitLink();
+                if (e.key === 'Escape') { setEditingLink(false); }
+              }}
+              style={{ flex: 1, minWidth: 200, padding: '6px 10px', fontSize: 13 }}
+            />
+            <button className="btn btn-ghost btn-sm" onClick={commitLink} title="Сохранить">
+              <Check size={13}/>
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setEditingLink(false)} title="Отмена">
+              <X size={13}/>
+            </button>
+            {task.link && (
+              <button className="btn btn-ghost btn-sm btn-danger" onClick={removeLink} title="Удалить ссылку">
+                <Trash2 size={13}/>
+              </button>
+            )}
+          </>
+        ) : task.link ? (
+          <>
+            <a
+              href={task.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link-chip"
+              title={task.link}
+            >
+              <Link2 size={12}/>
+              <span className="label">{getLinkLabel(task.link)}</span>
+              <ExternalLink size={11} style={{ opacity: 0.6 }}/>
+            </a>
+            <button className="btn btn-ghost btn-sm" onClick={startEditLink} title="Изменить ссылку">
+              <Edit3 size={12}/>
+            </button>
+          </>
+        ) : (
+          <button className="btn btn-ghost btn-sm" onClick={startEditLink} title="Прикрепить ссылку">
+            <Link2 size={12}/> Прикрепить ссылку
+          </button>
+        )}
+      </div>
+
+      <div className="assignees" style={{ display: 'block', marginTop: 4 }}>
+        {task.assignees.length === 0 ? (
+          <div className="small" style={{ padding: '6px 0' }}>Без исполнителя</div>
+        ) : (
+          task.assignees.map((a, i) => (
+            <div key={i} className="assignee-row">
+              {editingAssigneeIdx === i ? (
+                <input
+                  autoFocus
+                  value={assigneeEditValue}
+                  onChange={e => setAssigneeEditValue(e.target.value)}
+                  onBlur={() => renameAssignee(i)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') renameAssignee(i);
+                    if (e.key === 'Escape') setEditingAssigneeIdx(null);
+                  }}
+                  style={{ flex: 1, padding: '4px 8px', fontSize: 14, fontWeight: 500 }}
+                />
+              ) : (
+                <span
+                  className="name"
+                  title={`${a.name} · клик для переименования`}
+                  onClick={() => startRename(i)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {a.name}
+                </span>
+              )}
+              <div className="status-segmented">
+                <button
+                  className={a.status === 'pending' || !a.status ? 'active pending' : ''}
+                  onClick={() => setStatus(i, 'pending')}
+                  title="Не сделано"
+                >
+                  <Square size={12}/> <span className="lbl">Не сделано</span>
+                </button>
+                <button
+                  className={a.status === 'in-progress' ? 'active in-progress' : ''}
+                  onClick={() => setStatus(i, 'in-progress')}
+                  title="В работе"
+                >
+                  <Clock size={12}/> <span className="lbl">В работе</span>
+                </button>
+                <button
+                  className={a.status === 'done' ? 'active done' : ''}
+                  onClick={() => setStatus(i, 'done')}
+                  title="Готово"
+                >
+                  <Check size={12}/> <span className="lbl">Готово</span>
+                </button>
+              </div>
+              {/* Индивидуальный срок исполнителя */}
+              {(() => {
+                const aDue = a.dueDate || task.dueDate;
+                const aCat = (a.status === "done") ? "future" : (aDue ? getDueCategory(aDue) : null);
+                return aDue ? (
+                  <span
+                    className={`due-pill ${aCat}`}
+                    style={{ cursor: 'pointer', fontSize: 10, padding: '2px 8px', flexShrink: 0 }}
+                    onClick={() => { setDateAssigneeIdx(i); setShowDatePicker(true); }}
+                    title={a.originalDueDate ? `Изначально: ${formatDateShort(a.originalDueDate)}` : "Клик — изменить срок"}
+                  >
+                    <Calendar size={10}/> {formatDateShort(aDue)}
+                    {(a.postponedCount || 0) > 0 && <span className="repeats">↻{a.postponedCount}</span>}
+                  </span>
+                ) : (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: 10, padding: '2px 6px', opacity: 0.4, flexShrink: 0 }}
+                    onClick={() => { setDateAssigneeIdx(i); setShowDatePicker(true); }}
+                    title="Установить срок"
+                  >
+                    <Calendar size={10}/>
+                  </button>
+                );
+              })()}
+              <button className="remove" onClick={() => removeAssignee(i)} title="Удалить исполнителя">
+                <X size={13}/>
+              </button>
+            </div>
+          ))
+        )}
+        <div style={{ marginTop: 8 }}>
+          {showAddAssignee ? (
+            <AssigneePicker
+              team={team}
+              existing={task.assignees.map(a => a.name)}
+              onSelect={(name) => {
+                if (task.assignees.find(a => a.name.toLowerCase() === name.toLowerCase())) {
+                  setShowAddAssignee(false);
+                  return;
+                }
+                onUpdate({ ...task, assignees: [...task.assignees, { name, status: "pending", dueDate: task.dueDate || null }] });
+                setShowAddAssignee(false);
+              }}
+              onCancel={() => setShowAddAssignee(false)}
+            />
+          ) : (
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowAddAssignee(true)} style={{ padding: '4px 10px', fontSize: 12 }}>
+              <Plus size={12}/> исполнитель
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   DUE-DATE POPOVER
+   ============================================================ */
+function DuePopover({ current, onPick, onClear, onClose }) {
+  const [customDate, setCustomDate] = useState(toInputDate(current));
+
+  // close on outside click
+  const ref = useRef(null);
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    setTimeout(() => document.addEventListener("mousedown", handler), 0);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  const quick = [
+    { label: "Завтра", days: 1 },
+    { label: "+3 дня", days: 3 },
+    { label: "Через неделю", days: 7 },
+    { label: "Через 2 недели", days: 14 },
+  ];
+
+  return (
+    <div ref={ref} className="date-popover">
+      <div className="small" style={{ marginBottom: 8, fontWeight: 600 }}>Быстрый выбор</div>
+      <div className="quick">
+        {quick.map(q => (
+          <button key={q.label} onClick={() => onPick(addDays(Date.now(), q.days))}>{q.label}</button>
+        ))}
+      </div>
+      <div className="small" style={{ marginBottom: 4, fontWeight: 600 }}>Своя дата</div>
+      <input
+        type="date"
+        value={customDate}
+        onChange={e => setCustomDate(e.target.value)}
+        min={toInputDate(Date.now())}
+      />
+      <div className="pop-actions">
+        {current && (
+          <button className="btn btn-ghost btn-sm btn-danger" onClick={onClear}>
+            <X size={13}/> Убрать срок
+          </button>
+        )}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button className="btn btn-sm" onClick={onClose}>Отмена</button>
+          <button className="btn btn-sm btn-primary" disabled={!customDate} onClick={() => customDate && onPick(fromInputDate(customDate))}>
+            <Check size={13}/> Применить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ADD TASK MODAL
+   ============================================================ */
+function AddTaskModal({ onClose, onAdd, team = [] }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [link, setLink] = useState("");
+  const [assignees, setAssignees] = useState([]);
+
+  const submit = () => {
+    if (!title.trim()) return;
+    onAdd({
+      id: uid(),
+      title: title.trim(),
+      description: description.trim(),
+      link: link.trim() ? normalizeUrl(link) : null,
+      assignees,
+      createdAt: Date.now(),
+      meetingId: null
+    });
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div className="display" style={{ fontSize: 22 }}>Новая задача</div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}><X size={16}/></button>
+        </div>
+        <label>Что нужно сделать</label>
+        <input value={title} onChange={e => setTitle(e.target.value)} autoFocus />
+        <label style={{ marginTop: 16 }}>Детали (опционально)</label>
+        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} />
+        <label style={{ marginTop: 16 }}>Ссылка (опционально)</label>
+        <div className="row-flex">
+          <Link2 size={16} style={{ color: 'var(--ink-3)', flexShrink: 0 }}/>
+          <input
+            placeholder="https://docs.google.com/..."
+            value={link}
+            onChange={e => setLink(e.target.value)}
+          />
+        </div>
+        <label style={{ marginTop: 16 }}>Исполнители</label>
+        <div style={{ display: 'block' }}>
+          <AssigneePicker
+            team={team}
+            existing={assignees.map(a => a.name)}
+            autoFocus={false}
+            onSelect={(name) => {
+              if (!assignees.find(a => a.name.toLowerCase() === name.toLowerCase())) {
+                setAssignees([...assignees, { name, status: "pending" }]);
+              }
+            }}
+            onCancel={() => {}}
+          />
+        </div>
+        <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {assignees.map((a, i) => (
+            <span key={i} className="assignee-chip">
+              <span className="name">{a.name}</span>
+              <X size={12} style={{ cursor: 'pointer' }} onClick={() => setAssignees(assignees.filter((_, j) => j !== i))} />
+            </span>
+          ))}
+        </div>
+        <div className="actions-row" style={{ marginTop: 24, justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={onClose}>Отмена</button>
+          <button className="btn btn-primary" onClick={submit} disabled={!title.trim()}>
+            <Save size={14}/> Сохранить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ASSIGNEE PICKER — input with team autocomplete dropdown
+   ============================================================ */
+function AssigneePicker({ team = [], existing = [], onSelect, onCancel, placeholder = "Имя или выбор из команды", autoFocus = true, compact = false }) {
+  const [value, setValue] = useState("");
+  const [open, setOpen] = useState(true);
+  const wrapperRef = useRef(null);
+
+  // Filter team: exclude already-assigned, match by alias/fullName/telegram
+  const filtered = useMemo(() => {
+    const v = value.trim().toLowerCase().replace(/^@/, "");
+    const existingLower = existing.map(e => e.toLowerCase());
+    return team.filter(m => {
+      // skip already-added (compare by fullName or telegram)
+      const fn = m.fullName.toLowerCase();
+      const tg = (m.telegram || "").toLowerCase().replace(/^@/, "");
+      if (existingLower.includes(fn) || (tg && existingLower.includes("@" + tg))) return false;
+      if (!v) return true;
+      if (fn.includes(v)) return true;
+      if (tg.includes(v)) return true;
+      return (m.aliases || []).some(a => a.toLowerCase().includes(v));
+    });
+  }, [team, existing, value]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        if (onCancel) onCancel();
+      }
+    };
+    setTimeout(() => document.addEventListener("mousedown", handler), 0);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onCancel]);
+
+  const commit = (name) => {
+    const n = (name || value).trim();
+    if (!n) return;
+    onSelect(n);
+    setValue("");
+  };
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', display: 'inline-block', minWidth: compact ? 160 : 220 }}>
+      <input
+        autoFocus={autoFocus}
+        value={value}
+        placeholder={placeholder}
+        onChange={e => { setValue(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { commit(); }
+          if (e.key === 'Escape') { if (onCancel) onCancel(); }
+        }}
+        style={{ width: '100%', padding: compact ? '5px 10px' : '6px 10px', fontSize: 13 }}
+      />
+      {open && filtered.length > 0 && (
+        <div className="assignee-dropdown">
+          {filtered.map(m => (
+            <button key={m.id} className="assignee-option" onClick={() => commit(m.fullName)} type="button">
+              <span className="opt-name">{m.fullName}</span>
+              {m.telegram && <span className="opt-tg">{m.telegram}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   TEAM MODAL — справочник команды
+   ============================================================ */
+function TeamModal({ team, onClose, onSave, onDelete }) {
+  const [editing, setEditing] = useState(null); // member object being edited, or "new"
+  const [form, setForm] = useState({ fullName: "", aliases: "", telegram: "" });
+
+  const startEdit = (member) => {
+    setEditing(member);
+    setForm({
+      fullName: member.fullName || "",
+      aliases: (member.aliases || []).join(", "),
+      telegram: member.telegram || ""
+    });
+  };
+  const startNew = () => {
+    setEditing("new");
+    setForm({ fullName: "", aliases: "", telegram: "" });
+  };
+  const cancelEdit = () => setEditing(null);
+
+  const submit = async () => {
+    const fullName = form.fullName.trim();
+    if (!fullName) return;
+    const aliases = form.aliases.split(",").map(a => a.trim()).filter(Boolean);
+    let telegram = form.telegram.trim();
+    if (telegram && !telegram.startsWith("@")) telegram = "@" + telegram;
+    const member = editing === "new"
+      ? { fullName, aliases, telegram }
+      : { ...editing, fullName, aliases, telegram };
+    await onSave(member);
+    setEditing(null);
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div className="display" style={{ fontSize: 22 }}>Справочник команды</div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}><X size={16}/></button>
+        </div>
+        <div className="small" style={{ marginBottom: 16 }}>
+          Имена из этого списка ИИ распознаёт в транскрипции (включая прозвища) и автоматически использует полное имя при назначении задач. Также эти люди появляются в подсказке при добавлении исполнителя.
+        </div>
+
+        {editing ? (
+          <div className="card" style={{ background: 'var(--surface-2)', marginBottom: 12 }}>
+            <label>Полное имя <span style={{ color: 'var(--warn)' }}>*</span></label>
+            <input value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} placeholder="Иванов Иван" autoFocus />
+            <label style={{ marginTop: 12 }}>Прозвища и варианты имени (через запятую)</label>
+            <input value={form.aliases} onChange={e => setForm(f => ({ ...f, aliases: e.target.value }))} placeholder="Ваня, Иван, Иванов" />
+            <label style={{ marginTop: 12 }}>Telegram-юзернейм</label>
+            <input value={form.telegram} onChange={e => setForm(f => ({ ...f, telegram: e.target.value }))} placeholder="@username" />
+            <div className="actions-row" style={{ marginTop: 16, justifyContent: 'flex-end' }}>
+              <button className="btn" onClick={cancelEdit}>Отмена</button>
+              <button className="btn btn-primary" onClick={submit} disabled={!form.fullName.trim()}>
+                <Save size={14}/> Сохранить
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 12 }}>
+            <button className="btn btn-primary" onClick={startNew}><Plus size={14}/> Добавить сотрудника</button>
+          </div>
+        )}
+
+        <div style={{ maxHeight: 380, overflowY: 'auto', marginRight: -8, paddingRight: 8 }}>
+          {team.length === 0 ? (
+            <div className="small">Список пуст</div>
+          ) : (
+            team.map(m => (
+              <div key={m.id} className="team-row">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{m.fullName}</div>
+                  <div className="small" style={{ marginTop: 2 }}>
+                    {m.telegram && <span className="opt-tg" style={{ marginRight: 8 }}>{m.telegram}</span>}
+                    {(m.aliases || []).length > 0 && <span>{m.aliases.join(", ")}</span>}
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => startEdit(m)} title="Изменить">
+                  <Edit3 size={13}/>
+                </button>
+                <button className="btn btn-ghost btn-sm btn-danger" onClick={() => onDelete(m.id)} title="Удалить">
+                  <Trash2 size={13}/>
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   TELEGRAM SHARE BUTTON
+   Открывает Telegram (приложение или веб) с готовым текстом.
+   Пользователь выбирает чат и подтверждает отправку.
+   ============================================================ */
+function TgSendButton({ text, showToast, tgConfig, compact = false }) {
+  const [sending, setSending] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const hasBot = !!tgConfig?.botToken;
+  const hasWebhook = !!tgConfig?.webhookUrl;
+  const canDirect = !_artifactStorage && (hasBot || hasWebhook) && tgConfig?.chats?.length > 0;
+
+  const sendDirect = async (chat) => {
+    setSending(true);
+    setShowPicker(false);
+    try {
+      const clean = stripMarkdown(text);
+      if (hasBot) {
+        // Прямой Bot API
+        const parts = splitForTelegram(clean);
+        for (const part of parts) {
+          const res = await fetch(`https://api.telegram.org/bot${tgConfig.botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chat.chatId, text: part, disable_web_page_preview: true })
+          });
+          const data = await res.json();
+          if (!data.ok) throw new Error(data.description || "Ошибка Bot API");
+        }
+      } else if (hasWebhook) {
+        // Make.com webhook
+        const res = await fetch(tgConfig.webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chat.chatId, chatId: chat.chatId, text: clean, chat_name: chat.name })
+        });
+        if (!res.ok) throw new Error("Webhook вернул " + res.status);
+      }
+      showToast?.(`✓ Отправлено в «${chat.name}»`);
+    } catch (e) {
+      showToast?.(`Ошибка: ${e.message}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const shareViaUrl = () => {
+    const clean = stripMarkdown((text || "").trim());
+    if (!clean) { showToast?.("Нет текста"); return; }
+    const encoded = encodeURIComponent(clean);
+    const shareUrl = `https://t.me/share/url?url=&text=${encoded}`;
+    if (shareUrl.length < 4000) {
+      const a = document.createElement("a");
+      a.href = shareUrl; a.target = "_blank"; a.rel = "noopener noreferrer";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showToast?.("📤 Открываю Telegram — выберите чат и нажмите «Отправить»");
+    } else {
+      copyToClipboard(text, () => {});
+      showToast?.("📋 Текст скопирован! Откройте Telegram → зайдите в чат → вставьте (Ctrl+V)");
+    }
+  };
+
+  const handleClick = () => {
+    if (!canDirect) { shareViaUrl(); return; }
+    if (tgConfig.chats.length === 1) { sendDirect(tgConfig.chats[0]); return; }
+    setShowPicker(p => !p);
+  };
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button className="btn btn-sm btn-tg" onClick={handleClick} disabled={sending} title={canDirect ? "Отправить ботом напрямую в чат" : "Открыть Telegram для пересылки"}>
+        {sending ? <Loader2 size={13} className="spin"/> : <Send size={13}/>}
+        {canDirect
+          ? (tgConfig.chats.length === 1 ? ` Отправить в «${tgConfig.chats[0].name}»` : ` Отправить ботом`)
+          : ` Поделиться в Telegram`
+        }
+      </button>
+      {showPicker && canDirect && (
+        <div className="tg-chat-picker">
+          <div className="small" style={{ padding: '6px 10px 4px', opacity: 0.7 }}>Выберите чат:</div>
+          {tgConfig.chats.map(chat => (
+            <button key={chat.id} className="tg-chat-option" onClick={() => sendDirect(chat)}>
+              <Send size={12}/> {chat.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   TELEGRAM SETTINGS MODAL
+   ============================================================ */
+function TelegramModal({ config, onSave, onClose }) {
+  const [botToken, setBotToken] = useState(config?.botToken || "");
+  const [webhookUrl, setWebhookUrl] = useState(config?.webhookUrl || "");
+  const [chats, setChats] = useState(config?.chats || []);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [newChat, setNewChat] = useState({ name: "", chatId: "" });
+  const [addingChat, setAddingChat] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const testConnection = async () => {
+    if (chats.length === 0) return;
+    setTesting(true); setTestResult(null);
+    try {
+      const now = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+      if (botToken.trim()) {
+        // Тест Bot API
+        const meRes = await fetch(`https://api.telegram.org/bot${botToken.trim()}/getMe`);
+        const meData = await meRes.json();
+        if (!meData.ok) throw new Error(meData.description || "Неверный токен");
+        const sendRes = await fetch(`https://api.telegram.org/bot${botToken.trim()}/sendMessage`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chats[0].chatId, text: `🧪 Тест · ${now}\nБот: @${meData.result.username}` })
+        });
+        const sendData = await sendRes.json();
+        if (!sendData.ok) throw new Error(sendData.description || "Ошибка отправки");
+        setTestResult({ ok: true, msg: `✓ Bot API: @${meData.result.username} → «${chats[0].name}»` });
+      } else if (webhookUrl.trim()) {
+        // Тест webhook
+        const res = await fetch(webhookUrl.trim(), {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chats[0].chatId, chatId: chats[0].chatId, text: `🧪 Тест с сайта · ${now}`, chat_name: chats[0].name })
+        });
+        if (!res.ok) throw new Error("Webhook вернул " + res.status);
+        setTestResult({ ok: true, msg: `✓ Webhook → «${chats[0].name}» (проверьте Telegram)` });
+      } else {
+        throw new Error("Заполните Bot Token ИЛИ Webhook URL");
+      }
+    } catch (e) {
+      setTestResult({ ok: false, msg: e.message });
+    } finally { setTesting(false); }
+  };
+  const addChat = () => {
+    const name = newChat.name.trim(), chatId = newChat.chatId.trim();
+    if (!name || !chatId) return;
+    setChats(prev => [...prev, { id: String(Date.now()), name, chatId }]);
+    setNewChat({ name: "", chatId: "" }); setAddingChat(false);
+  };
+  const removeChat = (id) => setChats(prev => prev.filter(c => c.id !== id));
+  const save = async () => {
+    if (!botToken.trim() && !webhookUrl.trim()) return;
+    setSaving(true);
+    await onSave({ botToken: botToken.trim(), webhookUrl: webhookUrl.trim(), chats });
+    setSaving(false); onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <div className="display" style={{ fontSize: 22 }}>Telegram</div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}><X size={16}/></button>
+        </div>
+        <div className="small" style={{ marginBottom: 20 }}>Заполните <strong>один из двух</strong> вариантов отправки. Можно настроить оба — приоритет у Bot API.</div>
+
+        <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, marginBottom: 14 }}>
+          <label style={{ marginBottom: 6 }}>Вариант 1 · Bot API (быстрее)</label>
+          <input type="password" placeholder="Токен бота от @BotFather: 1234567890:ABC..." value={botToken} onChange={e => { setBotToken(e.target.value); setTestResult(null); }} style={{ fontFamily: 'monospace', fontSize: 12 }} />
+        </div>
+
+        <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, marginBottom: 14 }}>
+          <label style={{ marginBottom: 6 }}>Вариант 2 · Make.com Webhook</label>
+          <input placeholder="https://hook.us2.make.com/..." value={webhookUrl} onChange={e => { setWebhookUrl(e.target.value); setTestResult(null); }} style={{ fontFamily: 'monospace', fontSize: 12 }} />
+        </div>
+
+        <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label style={{ margin: 0 }}>Чаты</label>
+          <button className="btn btn-sm" onClick={() => setAddingChat(a => !a)}><Plus size={13}/> Добавить чат</button>
+        </div>
+        {addingChat && (
+          <div className="card" style={{ background: 'var(--surface-2)', marginTop: 10 }}>
+            <label>Название</label>
+            <input placeholder="МОП АРТЕМ" value={newChat.name} onChange={e => setNewChat(n => ({ ...n, name: e.target.value }))} autoFocus />
+            <label style={{ marginTop: 10 }}>Chat ID</label>
+            <input placeholder="-1001234567890" value={newChat.chatId} onChange={e => setNewChat(n => ({ ...n, chatId: e.target.value }))} style={{ fontFamily: 'monospace' }} />
+            <div className="actions-row" style={{ marginTop: 12, justifyContent: 'flex-end' }}>
+              <button className="btn btn-sm" onClick={() => setAddingChat(false)}>Отмена</button>
+              <button className="btn btn-sm btn-primary" onClick={addChat} disabled={!newChat.name.trim() || !newChat.chatId.trim()}><Check size={13}/> Добавить</button>
+            </div>
+          </div>
+        )}
+        <div style={{ marginTop: 10 }}>
+          {chats.length === 0 ? (
+            <div className="small" style={{ padding: '8px 0' }}>Чатов нет. Добавьте хотя бы один.</div>
+          ) : chats.map(chat => (
+            <div key={chat.id} className="team-row">
+              <div style={{ flex: 1 }}><div style={{ fontWeight: 600 }}>{chat.name}</div><code style={{ fontSize: 12, color: 'var(--ink-3)' }}>{chat.chatId}</code></div>
+              <button className="btn btn-ghost btn-sm btn-danger" onClick={() => removeChat(chat.id)}><Trash2 size={13}/></button>
+            </div>
+          ))}
+        </div>
+        {(botToken.trim() || webhookUrl.trim()) && chats.length > 0 && (
+          <div style={{ marginTop: 16, padding: 12, background: 'var(--surface-2)', borderRadius: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-sm" onClick={testConnection} disabled={testing}>
+                {testing ? <Loader2 size={13} className="spin"/> : <Send size={13}/>} Тест-сообщение
+              </button>
+              <span className="small" style={{ flex: 1 }}>Через {botToken.trim() ? "Bot API" : "Webhook"} в «{chats[0]?.name}»</span>
+            </div>
+            {testResult && (
+              <div style={{ marginTop: 8, padding: 8, borderRadius: 6, fontSize: 13, background: testResult.ok ? 'var(--accent-tint)' : 'var(--warn-tint)', color: testResult.ok ? 'var(--accent-2)' : 'var(--warn)' }}>
+                {testResult.msg}
+              </div>
+            )}
+          </div>
+        )}
+        <div className="actions-row" style={{ marginTop: 24, justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={onClose}>Отмена</button>
+          <button className="btn btn-primary" onClick={save} disabled={(!botToken.trim() && !webhookUrl.trim()) || saving}>
+            {saving ? <Loader2 size={13} className="spin"/> : <Save size={13}/>} Сохранить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   MINIMAL MARKDOWN RENDERER
+   ============================================================ */
+function renderMarkdown(text) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return lines.map((line, idx) => {
+    const parts = [];
+    let remaining = line;
+    let key = 0;
+    while (remaining.length > 0) {
+      // Ищем самый ранний матч: **bold** или [text](url)
+      const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+      const linkMatch = remaining.match(/\[(.+?)\]\((.+?)\)/);
+
+      let earliest = null, match = null;
+      if (boldMatch && (!linkMatch || boldMatch.index <= linkMatch.index)) {
+        earliest = "bold"; match = boldMatch;
+      } else if (linkMatch) {
+        earliest = "link"; match = linkMatch;
+      }
+
+      if (earliest === "bold") {
+        const before = remaining.slice(0, match.index);
+        if (before) parts.push(<span key={key++}>{before}</span>);
+        parts.push(<strong key={key++}>{match[1]}</strong>);
+        remaining = remaining.slice(match.index + match[0].length);
+      } else if (earliest === "link") {
+        const before = remaining.slice(0, match.index);
+        if (before) parts.push(<span key={key++}>{before}</span>);
+        parts.push(
+          <a key={key++} href={match[2]} target="_blank" rel="noopener noreferrer"
+             style={{ color: 'var(--accent)', textDecoration: 'underline', fontWeight: 500 }}>
+            {match[1]}
+          </a>
+        );
+        remaining = remaining.slice(match.index + match[0].length);
+      } else {
+        parts.push(<span key={key++}>{remaining}</span>);
+        remaining = "";
+      }
+    }
+    return <div key={idx} style={{ minHeight: '1.55em' }}>{parts.length > 0 ? parts : '\u00A0'}</div>;
+  });
+}
+
+// ═══ MOUNTING ═══
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>

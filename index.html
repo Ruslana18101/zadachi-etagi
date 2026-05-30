@@ -321,6 +321,12 @@ const toInputDate = (ts) => {
 /* ============================================================
    ФОРМАТИРОВАНИЕ ЗАДАЧ ДЛЯ ОТПРАВКИ В TELEGRAM
    ============================================================ */
+const getTaskLinks = (task) => {
+  if (Array.isArray(task.links)) return task.links.filter(Boolean);
+  if (task.link) return [task.link];
+  return [];
+};
+
 const formatTaskForShare = (task) => {
   const lines = [`📌 ${task.title}`];
   if (task.description) lines.push(task.description);
@@ -330,7 +336,8 @@ const formatTaskForShare = (task) => {
   }
   const assignees = (task.assignees || []).map(a => a.name).join(", ");
   if (assignees) lines.push(`👤 ${assignees}`);
-  if (task.link) lines.push(`🔗 ${task.link}`);
+  const links = getTaskLinks(task);
+  for (const l of links) lines.push(`🔗 ${l}`);
   return lines.join("\n");
 };
 
@@ -380,10 +387,11 @@ const generateICS = (tasks) => {
   const now = icsDateTime(Date.now());
   const events = tasks.filter(t => t.dueDate).map(t => {
     const pending = (t.assignees || []).filter(a => a.status !== "done").map(a => a.name);
+    const tlinks = getTaskLinks(t);
     const descParts = [
       pending.length ? "Исполнители: " + pending.join(", ") : "",
       t.description ? t.description : "",
-      t.link ? "Ссылка: " + t.link : ""
+      ...tlinks.map(l => "Ссылка: " + l)
     ].filter(Boolean);
     const lines = [
       "BEGIN:VEVENT",
@@ -393,7 +401,7 @@ const generateICS = (tasks) => {
       `DTEND;VALUE=DATE:${icsDate(addDays(t.dueDate, 1))}`,
       `SUMMARY:📋 ${icsEscape(t.title)}`,
       `DESCRIPTION:${icsEscape(descParts.join("\n"))}`,
-      ...(t.link ? [`URL:${icsEscape(t.link)}`] : []),
+      ...(tlinks.length ? [`URL:${icsEscape(tlinks[0])}`] : []),
       "BEGIN:VALARM",
       "TRIGGER:-PT12H",
       "ACTION:DISPLAY",
@@ -620,7 +628,8 @@ const generateReminderText = (tasks) => {
   }
   const fmt = (t) => {
     const pending = t.assignees.filter(a => a.status !== "done").map(a => a.name).join(", ");
-    const linkPart = t.link ? `\n  🔗 ${t.link}` : "";
+    const tlinks = getTaskLinks(t);
+    const linkPart = tlinks.length ? "\n" + tlinks.map(l => `  🔗 ${l}`).join("\n") : "";
     return `• ${t.title}${pending ? " — " + pending : ""}${t.dueDate ? " (" + formatDueDate(t.dueDate) + ")" : ""}${linkPart}`;
   };
   const today_d = new Date();
@@ -2018,12 +2027,11 @@ function NewMeetingView({ onSave, showToast, existingEmployees = [], team = [], 
       type: draft.type || "group",
       employee: draft.employee || null
     };
-    const meetingTasks = draft.tasks.map(t => ({
-      ...t,
-      meetingId,
-      meetingType: meeting.type,
-      employee: meeting.employee
-    }));
+    const meetingTasks = draft.tasks.map(t => {
+      const linksArr = t.link ? [t.link] : (Array.isArray(t.links) ? t.links : []);
+      const { link, ...rest } = t;
+      return { ...rest, links: linksArr, meetingId, meetingType: meeting.type, employee: meeting.employee };
+    });
 
     // Применяем принятые обновления к существующим задачам
     if (draft.taskUpdates && onUpdateTask) {
@@ -2785,7 +2793,7 @@ function TasksView({ tasks, meetings, onUpdate, onDelete, onAdd, onSelectMeeting
       });
       lines.push(`👤 ${mentions.join(" ")}`);
     }
-    if (task.link) lines.push(`🔗 ${task.link}`);
+    for (const l of getTaskLinks(task)) lines.push(`🔗 ${l}`);
     return lines.join("\n");
   };
 
@@ -2871,7 +2879,12 @@ function TasksView({ tasks, meetings, onUpdate, onDelete, onAdd, onSelectMeeting
     if (!merged.dueDate && source.dueDate) merged.dueDate = source.dueDate;
 
     // Ссылка: берём если нет
-    if (!merged.link && source.link) merged.link = source.link;
+    const targetLinks = getTaskLinks(merged);
+    const sourceLinks = getTaskLinks(source);
+    const allLinks = [...targetLinks];
+    for (const l of sourceLinks) if (!allLinks.includes(l)) allLinks.push(l);
+    merged.links = allLinks;
+    merged.link = null;
 
     onUpdate(merged);
     onDelete(sourceId);
@@ -3254,21 +3267,22 @@ function TaskCard({ task, onUpdate, onDelete, meetingLabel, onMeetingClick, show
 
   const commitLink = () => {
     const v = linkValue.trim();
-    if (!v) {
-      onUpdate({ ...task, link: null });
-    } else {
-      const norm = normalizeUrl(v);
-      if (norm) onUpdate({ ...task, link: norm });
+    const currentLinks = getTaskLinks(task);
+    if (!v) { setEditingLink(false); return; }
+    const norm = normalizeUrl(v);
+    if (norm && !currentLinks.includes(norm)) {
+      onUpdate({ ...task, links: [...currentLinks, norm], link: null });
     }
+    setLinkValue("");
     setEditingLink(false);
   };
   const startEditLink = () => {
-    setLinkValue(task.link || "");
+    setLinkValue("");
     setEditingLink(true);
   };
-  const removeLink = () => {
-    onUpdate({ ...task, link: null });
-    setEditingLink(false);
+  const removeLinkAt = (idx) => {
+    const currentLinks = getTaskLinks(task);
+    onUpdate({ ...task, links: currentLinks.filter((_, i) => i !== idx), link: null });
   };
 
   const setStatus = (idx, next) => {
@@ -3437,8 +3451,20 @@ function TaskCard({ task, onUpdate, onDelete, meetingLabel, onMeetingClick, show
         )}
       </div>
 
-      {/* Link row */}
+      {/* Link row — supports multiple links */}
       <div className="link-row">
+        {getTaskLinks(task).map((url, idx) => (
+          <div key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <a href={url} target="_blank" rel="noopener noreferrer" className="link-chip" title={url}>
+              <Link2 size={12}/>
+              <span className="label">{getLinkLabel(url)}</span>
+              <ExternalLink size={11} style={{ opacity: 0.6 }}/>
+            </a>
+            <button className="btn btn-ghost btn-sm" onClick={() => removeLinkAt(idx)} title="Удалить ссылку" style={{ padding: '2px 4px' }}>
+              <X size={11}/>
+            </button>
+          </div>
+        ))}
         {editingLink ? (
           <>
             <Link2 size={14} style={{ color: 'var(--ink-3)', flexShrink: 0 }}/>
@@ -3449,42 +3475,16 @@ function TaskCard({ task, onUpdate, onDelete, meetingLabel, onMeetingClick, show
               onChange={e => setLinkValue(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter') commitLink();
-                if (e.key === 'Escape') { setEditingLink(false); }
+                if (e.key === 'Escape') { setEditingLink(false); setLinkValue(""); }
               }}
               style={{ flex: 1, minWidth: 200, padding: '6px 10px', fontSize: 13 }}
             />
-            <button className="btn btn-ghost btn-sm" onClick={commitLink} title="Сохранить">
-              <Check size={13}/>
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setEditingLink(false)} title="Отмена">
-              <X size={13}/>
-            </button>
-            {task.link && (
-              <button className="btn btn-ghost btn-sm btn-danger" onClick={removeLink} title="Удалить ссылку">
-                <Trash2 size={13}/>
-              </button>
-            )}
-          </>
-        ) : task.link ? (
-          <>
-            <a
-              href={task.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link-chip"
-              title={task.link}
-            >
-              <Link2 size={12}/>
-              <span className="label">{getLinkLabel(task.link)}</span>
-              <ExternalLink size={11} style={{ opacity: 0.6 }}/>
-            </a>
-            <button className="btn btn-ghost btn-sm" onClick={startEditLink} title="Изменить ссылку">
-              <Edit3 size={12}/>
-            </button>
+            <button className="btn btn-ghost btn-sm" onClick={commitLink} title="Сохранить"><Check size={13}/></button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setEditingLink(false); setLinkValue(""); }} title="Отмена"><X size={13}/></button>
           </>
         ) : (
-          <button className="btn btn-ghost btn-sm" onClick={startEditLink} title="Прикрепить ссылку">
-            <Link2 size={12}/> Прикрепить ссылку
+          <button className="btn btn-ghost btn-sm" onClick={startEditLink} title={getTaskLinks(task).length ? "Добавить ещё ссылку" : "Прикрепить ссылку"}>
+            <Plus size={12}/> {getTaskLinks(task).length ? "Ещё ссылка" : "Прикрепить ссылку"}
           </button>
         )}
       </div>

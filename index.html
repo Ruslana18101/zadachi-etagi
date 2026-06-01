@@ -295,6 +295,7 @@ const getDueCategory = (dueDate) => {
   const d = daysUntil(dueDate);
   if (d < 0) return "overdue";
   if (d === 0) return "today";
+  if (d === 1) return "tomorrow";
   if (d <= 7) return "week";
   return "future";
 };
@@ -617,13 +618,14 @@ const getLinkLabel = (url) => {
    REMINDER TEXT (для копирования в чат)
    ============================================================ */
 const generateReminderText = (tasks) => {
-  const overdue = [], today = [], week = [];
+  const overdue = [], today = [], tomorrow = [], week = [];
   for (const t of tasks) {
     const hasOpen = t.assignees.some(a => a.status !== "done") || t.assignees.length === 0;
     if (!hasOpen) continue;
     const cat = getDueCategory(t.dueDate);
     if (cat === "overdue") overdue.push(t);
     else if (cat === "today") today.push(t);
+    else if (cat === "tomorrow") tomorrow.push(t);
     else if (cat === "week") week.push(t);
   }
   const fmt = (t) => {
@@ -637,8 +639,9 @@ const generateReminderText = (tasks) => {
   const parts = [header];
   if (overdue.length) parts.push(`\n⚠️ ПРОСРОЧЕНО (${overdue.length}):\n` + overdue.map(fmt).join("\n"));
   if (today.length) parts.push(`\n📌 СЕГОДНЯ (${today.length}):\n` + today.map(fmt).join("\n"));
+  if (tomorrow.length) parts.push(`\n🌅 ЗАВТРА (${tomorrow.length}):\n` + tomorrow.map(fmt).join("\n"));
   if (week.length) parts.push(`\n🔜 БЛИЖАЙШИЕ 7 ДНЕЙ (${week.length}):\n` + week.map(fmt).join("\n"));
-  if (!overdue.length && !today.length && !week.length) parts.push("\n✅ Срочных задач нет");
+  if (!overdue.length && !today.length && !tomorrow.length && !week.length) parts.push("\n✅ Срочных задач нет");
   return parts.join("\n");
 };
 
@@ -1268,6 +1271,7 @@ const STYLES = `
   }
   .due-pill.overdue { background: var(--warn-tint); color: var(--warn); border-color: #e8a09a; }
   .due-pill.today { background: #fef9ec; color: #7a5d0f; border-color: var(--pending); }
+  .due-pill.tomorrow { background: #fff4e6; color: #c2410c; border-color: #fed7aa; }
   .due-pill.week { background: #fef9ec; color: #7a5d0f; border-color: #e6c95a; }
   .due-pill.future { background: var(--surface-2); color: var(--ink-2); border-color: var(--line-2); }
   .due-pill.no-date { background: var(--bg-tint); color: var(--ink-3); border-color: var(--line); }
@@ -1293,7 +1297,7 @@ const STYLES = `
   .date-popover .pop-actions { display: flex; gap: 6px; justify-content: space-between; margin-top: 10px; }
 
   /* ═══ DIGEST BANNER — gradient cards (TickTick-style) ═══ */
-  .digest { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+  .digest { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
   @media (max-width: 640px) { .digest { grid-template-columns: repeat(2, 1fr); } }
   .digest-card {
     border: none; background: var(--surface);
@@ -1317,6 +1321,10 @@ const STYLES = `
   .digest-card.today:not(.active) {
     background: linear-gradient(135deg, #fef9ec, #fdf1d0);
     color: #7a5d0f;
+  }
+  .digest-card.tomorrow:not(.active) {
+    background: linear-gradient(135deg, #fff4e6, #ffe8c8);
+    color: #c2410c;
   }
 
   .reminder-toolbar {
@@ -2916,7 +2924,7 @@ function TasksView({ tasks, meetings, onUpdate, onDelete, onAdd, onSelectMeeting
 
   // Digest counts (only open tasks count in deadline categories)
   const counts = useMemo(() => {
-    const c = { overdue: 0, today: 0, week: 0, "no-date": 0, future: 0 };
+    const c = { overdue: 0, today: 0, tomorrow: 0, week: 0, "no-date": 0, future: 0 };
     for (const t of tasks) {
       if (!isOpen(t)) continue;
       c[getDueCategory(t.dueDate)]++;
@@ -3001,6 +3009,13 @@ function TasksView({ tasks, meetings, onUpdate, onDelete, onAdd, onSelectMeeting
         >
           <span className="label"><AlarmClock size={12}/> Сегодня</span>
           <span className="count">{counts.today}</span>
+        </button>
+        <button
+          className={`digest-card tomorrow ${dueFilter === 'tomorrow' ? 'active' : ''}`}
+          onClick={() => setDueFilter(dueFilter === 'tomorrow' ? null : 'tomorrow')}
+        >
+          <span className="label"><Bell size={12}/> Завтра</span>
+          <span className="count">{counts.tomorrow}</span>
         </button>
         <button
           className={`digest-card week ${dueFilter === 'week' ? 'active' : ''}`}
@@ -3105,6 +3120,7 @@ function TasksView({ tasks, meetings, onUpdate, onDelete, onAdd, onSelectMeeting
             {dueFilter && <span className="active-tag" style={{ marginLeft: 8 }}>
               {dueFilter === 'overdue' ? '⚠️ Просрочено' :
                dueFilter === 'today' ? '📌 Сегодня' :
+               dueFilter === 'tomorrow' ? '🌅 Завтра' :
                dueFilter === 'week' ? '🔜 На 7 дней' :
                '📅 Без срока'}
               <X size={12} style={{ marginLeft: 4, cursor: 'pointer' }} onClick={() => setDueFilter(null)}/>

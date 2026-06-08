@@ -2811,17 +2811,19 @@ function TasksView({ tasks, meetings, onUpdate, onDelete, onAdd, onSelectMeeting
     const selected = tasks.filter(t => selectedIds.has(t.id));
     if (!selected.length) { showToast("Ничего не выбрано"); return; }
     if (!tgConfig?.chats?.length) { showToast("Сначала настройте Telegram (кнопка в шапке)"); return; }
-    if (!tgConfig?.botToken && !tgConfig?.webhookUrl) { showToast("Нет токена бота и webhook"); return; }
+    if (!tgConfig?.botToken && !tgConfig?.webhookUrl) { showToast("Нет токена бота и webhook — откройте настройки Telegram"); return; }
 
-    const chat = tgConfig.chats[0]; // первый чат — МОП АРТЕМ
+    const chat = tgConfig.chats[0];
     const header = `📋 Напоминание по задачам (${selected.length})\n`;
     const body = selected.map(t => formatTaskForTg(t)).join("\n\n———\n\n");
     const fullText = header + "\n" + body;
 
     setSendingToTg(true);
-    try {
-      if (tgConfig.botToken) {
-        // Bot API — режем длинный текст на части
+    let sent = false;
+
+    // Пробуем Bot API (если есть токен)
+    if (tgConfig.botToken) {
+      try {
         const parts = splitForTelegram(fullText);
         for (const part of parts) {
           const res = await fetch(`https://api.telegram.org/bot${tgConfig.botToken}/sendMessage`, {
@@ -2830,23 +2832,37 @@ function TasksView({ tasks, meetings, onUpdate, onDelete, onAdd, onSelectMeeting
             body: JSON.stringify({ chat_id: chat.chatId, text: part, disable_web_page_preview: true })
           });
           const data = await res.json();
-          if (!data.ok) throw new Error(data.description || "Ошибка Bot API");
+          if (!data.ok) throw new Error(`Bot API: ${data.description} (chat_id: ${chat.chatId})`);
         }
-      } else if (tgConfig.webhookUrl) {
+        sent = true;
+      } catch (e) {
+        console.warn("Bot API failed, trying webhook...", e.message);
+        showToast(`⚠️ Bot API не сработал: ${e.message}. Пробую webhook...`);
+      }
+    }
+
+    // Если Bot API не сработал или нет токена — пробуем webhook
+    if (!sent && tgConfig.webhookUrl) {
+      try {
         const res = await fetch(tgConfig.webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: chat.chatId, chatId: chat.chatId, text: fullText, chat_name: chat.name })
         });
-        if (!res.ok) throw new Error("Webhook вернул " + res.status);
+        if (!res.ok) throw new Error(`Webhook вернул ${res.status} ${res.statusText}`);
+        sent = true;
+      } catch (e) {
+        showToast(`❌ Webhook тоже не сработал: ${e.message}`);
       }
+    }
+
+    if (sent) {
       showToast(`✓ Отправлено ${selected.length} задач(и) в «${chat.name}»`);
       setSelectedIds(new Set());
-    } catch (e) {
-      showToast("Ошибка: " + e.message);
-    } finally {
-      setSendingToTg(false);
+    } else if (!tgConfig.webhookUrl) {
+      showToast(`❌ Ошибка. Проверьте: бот в группе? правильный chat_id? токен действующий?`);
     }
+    setSendingToTg(false);
   };
 
   const duplicateTask = (task) => {
@@ -3919,10 +3935,12 @@ function TgSendButton({ text, showToast, tgConfig, compact = false }) {
   const sendDirect = async (chat) => {
     setSending(true);
     setShowPicker(false);
-    try {
-      const clean = stripMarkdown(text);
-      if (hasBot) {
-        // Прямой Bot API
+    let sent = false;
+    const clean = stripMarkdown(text);
+
+    // Сначала пробуем Bot API
+    if (hasBot) {
+      try {
         const parts = splitForTelegram(clean);
         for (const part of parts) {
           const res = await fetch(`https://api.telegram.org/bot${tgConfig.botToken}/sendMessage`, {
@@ -3931,23 +3949,32 @@ function TgSendButton({ text, showToast, tgConfig, compact = false }) {
             body: JSON.stringify({ chat_id: chat.chatId, text: part, disable_web_page_preview: true })
           });
           const data = await res.json();
-          if (!data.ok) throw new Error(data.description || "Ошибка Bot API");
+          if (!data.ok) throw new Error(`Bot API: ${data.description} (chat_id: ${chat.chatId})`);
         }
-      } else if (hasWebhook) {
-        // Make.com webhook
+        sent = true;
+      } catch (e) {
+        console.warn("Bot API failed:", e.message);
+        if (!hasWebhook) showToast?.(`❌ ${e.message}`);
+      }
+    }
+
+    // Если Bot API не сработал — пробуем webhook
+    if (!sent && hasWebhook) {
+      try {
         const res = await fetch(tgConfig.webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: chat.chatId, chatId: chat.chatId, text: clean, chat_name: chat.name })
         });
-        if (!res.ok) throw new Error("Webhook вернул " + res.status);
+        if (!res.ok) throw new Error(`Webhook вернул ${res.status}`);
+        sent = true;
+      } catch (e) {
+        showToast?.(`❌ Webhook: ${e.message}`);
       }
-      showToast?.(`✓ Отправлено в «${chat.name}»`);
-    } catch (e) {
-      showToast?.(`Ошибка: ${e.message}`);
-    } finally {
-      setSending(false);
     }
+
+    if (sent) showToast?.(`✓ Отправлено в «${chat.name}»`);
+    setSending(false);
   };
 
   const shareViaUrl = () => {

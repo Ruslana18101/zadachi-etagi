@@ -1767,38 +1767,95 @@ function App() {
                 <div className="display" style={{ fontSize: 20 }}>📦 Импорт данных</div>
                 <button className="btn btn-ghost btn-sm" onClick={() => { setShowImportModal(false); setImportText(""); }}><X size={16}/></button>
               </div>
-              <div className="small" style={{ marginBottom: 10 }}>
-                В артефакте Claude нажмите <strong>«📋 Экспорт данных»</strong> → в открывшемся окне нажмите <strong>«Скопировать данные»</strong>.<br/>
-                Затем вернитесь сюда и вставьте в поле ниже (<strong>Ctrl+V</strong> или <strong>Cmd+V</strong>).
+
+              {/* Подсказка */}
+              <div style={{ padding: 12, background: 'var(--accent-tint)', borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>💡 Как перенести только новое собрание</div>
+                <div>В артефакте нажмите <strong>«📤 Новое собрание»</strong> → скопируйте → вставьте ниже → выберите <strong>«Только добавить новое»</strong>.</div>
               </div>
+
               <textarea
                 placeholder="Вставьте сюда скопированные данные (Ctrl+V / Cmd+V)..."
                 value={importText}
                 onChange={e => setImportText(e.target.value)}
-                rows={8}
+                rows={6}
                 autoFocus
                 style={{ fontFamily: 'monospace', fontSize: 11 }}
               />
               {importText.trim() && (() => {
-                try { const d = JSON.parse(importText); return <div className="small" style={{ marginTop: 6, color: 'var(--accent)' }}>✓ Найдено {Object.keys(d).length} записей</div>; }
-                catch { return <div className="small" style={{ marginTop: 6, color: 'var(--warn)' }}>✗ Неверный формат — убедитесь что скопировали данные кнопкой «Скопировать данные»</div>; }
+                try {
+                  const d = JSON.parse(importText);
+                  const keys = Object.keys(d);
+                  const meetings = keys.filter(k => k.startsWith('meeting:')).length;
+                  const tasks = keys.filter(k => k.startsWith('task:')).length;
+                  const newItems = keys.filter(k => !localStorage.getItem(k)).length;
+                  return (
+                    <div style={{ marginTop: 6, fontSize: 12 }}>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>✓ {keys.length} записей</span>
+                      <span style={{ color: 'var(--ink-2)', marginLeft: 10 }}>
+                        {meetings > 0 && `${meetings} собрание`}
+                        {tasks > 0 && ` · ${tasks} задач`}
+                      </span>
+                      {newItems < keys.length && (
+                        <span style={{ color: 'var(--pending)', marginLeft: 10 }}>
+                          ⚠️ {keys.length - newItems} уже есть на сайте
+                        </span>
+                      )}
+                    </div>
+                  );
+                } catch { return <div style={{ marginTop: 6, fontSize: 12, color: 'var(--warn)' }}>✗ Неверный формат</div>; }
               })()}
-              <div className="actions-row" style={{ marginTop: 12, justifyContent: 'flex-end' }}>
+
+              <div className="actions-row" style={{ marginTop: 14, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button className="btn" onClick={() => { setShowImportModal(false); setImportText(""); }}>Отмена</button>
-                <button className="btn btn-primary" disabled={!importText.trim()} onClick={async () => {
-                  try {
-                    const data = JSON.parse(importText);
-                    let count = 0;
-                    for (const [key, value] of Object.entries(data)) {
-                      localStorage.setItem(key, value);
-                      cloud.upsert(key, value).catch(() => {});
-                      count++;
-                    }
-                    setShowImportModal(false); setImportText("");
-                    showToast('📦 Импортировано ' + count + ' записей. Перезагружаю…');
-                    setTimeout(() => window.location.reload(), 1500);
-                  } catch (e) { showToast('Ошибка: ' + e.message); }
-                }}><Upload size={13}/> Загрузить данные</button>
+                <button
+                  className="btn"
+                  disabled={!importText.trim()}
+                  title="Добавит только то чего нет на сайте — существующие задачи и статусы не тронет"
+                  onClick={async () => {
+                    try {
+                      const data = JSON.parse(importText);
+                      let added = 0, skipped = 0;
+                      for (const [key, value] of Object.entries(data)) {
+                        // Пропускаем tg-config и team — они уже настроены на сайте
+                        if (key === 'tg-config' || key.startsWith('team:')) { skipped++; continue; }
+                        // Добавляем только то чего нет
+                        if (!localStorage.getItem(key)) {
+                          localStorage.setItem(key, value);
+                          cloud.upsert(key, value).catch(() => {});
+                          added++;
+                        } else { skipped++; }
+                      }
+                      setShowImportModal(false); setImportText("");
+                      showToast(`✓ Добавлено ${added} новых записей. Пропущено ${skipped} существующих. Перезагружаю…`);
+                      setTimeout(() => window.location.reload(), 1800);
+                    } catch (e) { showToast('Ошибка: ' + e.message); }
+                  }}
+                >
+                  <Plus size={13}/> Только добавить новое
+                </button>
+                <button
+                  className="btn btn-primary"
+                  disabled={!importText.trim()}
+                  title="Перезапишет ВСЕ данные — статусы задач, сроки и история на сайте будут потеряны"
+                  onClick={async () => {
+                    if (!window.confirm('Это перезапишет ВСЕ данные на сайте включая статусы задач и перенесённые сроки. Продолжить?')) return;
+                    try {
+                      const data = JSON.parse(importText);
+                      let count = 0;
+                      for (const [key, value] of Object.entries(data)) {
+                        localStorage.setItem(key, value);
+                        cloud.upsert(key, value).catch(() => {});
+                        count++;
+                      }
+                      setShowImportModal(false); setImportText("");
+                      showToast(`📦 Полный импорт: ${count} записей. Перезагружаю…`);
+                      setTimeout(() => window.location.reload(), 1500);
+                    } catch (e) { showToast('Ошибка: ' + e.message); }
+                  }}
+                >
+                  <Upload size={13}/> Полный перенос (перезапись)
+                </button>
               </div>
             </div>
           </div>

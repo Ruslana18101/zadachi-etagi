@@ -205,13 +205,15 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
    TEAM DIRECTORY
    ============================================================ */
 const SEED_TEAM = [
-  { fullName: "Наговицина Руслана", aliases: ["Руслана", "Наговицина"],          telegram: "@Nagovitsina_Ruslana", sortOrder: 0 },
-  { fullName: "Вашута Ксения",     aliases: ["Ксюша", "Ксения", "Вашута"],       telegram: "@XeniaVashuta",        sortOrder: 1 },
-  { fullName: "Проценко Алексей",  aliases: ["Лёша", "Леша", "Алексей", "Проценко"], telegram: "@protsenko_realty", sortOrder: 2 },
-  { fullName: "Парфенова Дарья",   aliases: ["Даша", "Дарья", "Парфенова"],       telegram: "@Darya2309",           sortOrder: 3 },
-  { fullName: "Шугалей Игорь",     aliases: ["Игорь", "Шугалей"],                 telegram: "@i_g_o_r_1_9_9_1",    sortOrder: 4 },
-  { fullName: "Голубев",            aliases: ["Голубев"],                           telegram: "",                     sortOrder: 5 },
-  { fullName: "Турандина",          aliases: ["Турандина"],                         telegram: "",                     sortOrder: 6 },
+  { fullName: "Наговицина Руслана", aliases: ["Руслана", "Наговицина"],               telegram: "@Nagovitsina_Ruslana", sortOrder: 0 },
+  { fullName: "Вашута Ксения",      aliases: ["Ксюша", "Ксения", "Вашута"],           telegram: "@XeniaVashuta",        sortOrder: 1 },
+  { fullName: "Проценко Алексей",   aliases: ["Лёша", "Леша", "Алексей", "Проценко"], telegram: "@protsenko_realty",    sortOrder: 2 },
+  { fullName: "Парфенова Дарья",    aliases: ["Даша", "Дарья", "Парфенова"],           telegram: "@Darya2309",           sortOrder: 3 },
+  { fullName: "Шугалей Игорь",      aliases: ["Игорь", "Шугалей"],                     telegram: "@i_g_o_r_1_9_9_1",    sortOrder: 4 },
+  { fullName: "Голубев",             aliases: ["Голубев"],                               telegram: "",                     sortOrder: 5 },
+  { fullName: "Турандина",           aliases: ["Турандина"],                             telegram: "",                     sortOrder: 6 },
+  { fullName: "Левман",              aliases: ["Левман"],                                telegram: "",                     sortOrder: 7 },
+  { fullName: "HR Новенький",        aliases: ["HR", "Новенький", "Новенький HR", "эйчар"], telegram: "",                sortOrder: 8 },
 ];
 
 const formatTeamForPrompt = (team) => {

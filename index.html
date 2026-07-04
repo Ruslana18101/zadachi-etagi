@@ -2205,20 +2205,23 @@ function NewMeetingView({ onSave, showToast, existingEmployees = [], team = [], 
               autoFocus
             />
             <datalist id="employees-datalist">
-              {existingEmployees.map(name => <option key={name} value={name} />)}
+              {team.filter(m => m.fullName !== "Наговицина Руслана").map(m => <option key={m.id} value={m.fullName} />)}
             </datalist>
-            {existingEmployees.length > 0 && (
+            {team.filter(m => m.fullName !== "Наговицина Руслана").length > 0 && (
               <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {existingEmployees.slice(0, 8).map(name => (
-                  <button
-                    key={name}
-                    className="filter-btn"
-                    onClick={() => setEmployee(name)}
-                    style={{ fontSize: 12 }}
-                  >
-                    {name}
-                  </button>
-                ))}
+                {team
+                  .filter(m => m.fullName !== "Наговицина Руслана")
+                  .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+                  .map(m => (
+                    <button
+                      key={m.id}
+                      className={`filter-btn ${employee === m.fullName ? 'active' : ''}`}
+                      onClick={() => setEmployee(m.fullName)}
+                      style={{ fontSize: 12 }}
+                    >
+                      {m.fullName}
+                    </button>
+                  ))}
               </div>
             )}
           </div>

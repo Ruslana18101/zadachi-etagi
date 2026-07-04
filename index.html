@@ -3752,15 +3752,42 @@ function AddTaskModal({ onClose, onAdd, team = [] }) {
   const [description, setDescription] = useState("");
   const [link, setLink] = useState("");
   const [assignees, setAssignees] = useState([]);
+  const [dueDate, setDueDate] = useState("");
+
+  const today = new Date();
+  const addDays = (n) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const quickDates = [
+    { label: "Сегодня",  value: addDays(0) },
+    { label: "Завтра",   value: addDays(1) },
+    { label: "3 дня",    value: addDays(3) },
+    { label: "Неделя",   value: addDays(7) },
+    { label: "2 недели", value: addDays(14) },
+    { label: "Месяц",    value: addDays(30) },
+  ];
 
   const submit = () => {
     if (!title.trim()) return;
+    const dueDateTs = dueDate ? new Date(dueDate + "T00:00:00").getTime() : null;
+    const assigneesWithDate = assignees.map(a => ({
+      ...a,
+      dueDate: dueDateTs,
+      originalDueDate: dueDateTs,
+      postponedCount: 0,
+    }));
     onAdd({
       id: uid(),
       title: title.trim(),
       description: description.trim(),
-      link: link.trim() ? normalizeUrl(link) : null,
-      assignees,
+      links: link.trim() ? [normalizeUrl(link)].filter(Boolean) : [],
+      link: null,
+      assignees: assigneesWithDate,
+      dueDate: dueDateTs,
+      originalDueDate: dueDateTs,
+      postponedCount: 0,
       createdAt: Date.now(),
       meetingId: null
     });
@@ -3774,17 +3801,35 @@ function AddTaskModal({ onClose, onAdd, team = [] }) {
           <button className="btn btn-ghost btn-sm" onClick={onClose}><X size={16}/></button>
         </div>
         <label>Что нужно сделать</label>
-        <input value={title} onChange={e => setTitle(e.target.value)} autoFocus />
+        <input value={title} onChange={e => setTitle(e.target.value)} autoFocus
+          onKeyDown={e => { if (e.key === 'Enter' && title.trim()) e.target.blur(); }} />
         <label style={{ marginTop: 16 }}>Детали (опционально)</label>
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} />
+
+        <label style={{ marginTop: 16 }}>Срок выполнения</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+          {quickDates.map(q => (
+            <button
+              key={q.value}
+              type="button"
+              className={`filter-btn ${dueDate === q.value ? 'active' : ''}`}
+              style={{ fontSize: 12 }}
+              onClick={() => setDueDate(dueDate === q.value ? "" : q.value)}
+            >{q.label}</button>
+          ))}
+        </div>
+        <div className="row-flex">
+          <Calendar size={16} style={{ color: 'var(--ink-3)', flexShrink: 0 }}/>
+          <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={{ flex: 1 }}/>
+          {dueDate && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setDueDate("")} title="Сбросить срок"><X size={14}/></button>
+          )}
+        </div>
+
         <label style={{ marginTop: 16 }}>Ссылка (опционально)</label>
         <div className="row-flex">
           <Link2 size={16} style={{ color: 'var(--ink-3)', flexShrink: 0 }}/>
-          <input
-            placeholder="https://docs.google.com/..."
-            value={link}
-            onChange={e => setLink(e.target.value)}
-          />
+          <input placeholder="https://docs.google.com/..." value={link} onChange={e => setLink(e.target.value)} />
         </div>
         <label style={{ marginTop: 16 }}>Исполнители</label>
         <div style={{ display: 'block' }}>

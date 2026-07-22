@@ -86,62 +86,165 @@ const ExternalLink = p => <SvgI {...p}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01
 const Send = p => <SvgI {...p}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></SvgI>;
 const Settings = p => <SvgI {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></SvgI>;
 
-// ═══ SUPABASE CLOUD SYNC ═══
+// ═══ SUPABASE CLOUD SYNC + AUTH ═══
 const SUPABASE_URL = "https://ducngqsmqvdowlqhehlk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1Y25ncXNtcXZkb3dscWhlaGxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTQ5MTcsImV4cCI6MjA5NTU5MDkxN30.yQ-JhOQ_P8cfgblUr6rFX8Eu31GdmjwhyhUE38ElhTg";
 
-const _supaHeaders = {
-  "apikey": SUPABASE_KEY,
-  "Authorization": "Bearer " + SUPABASE_KEY,
-  "Content-Type": "application/json"
+// ─── Хранение сессии ───
+const AUTH_KEY = "_supa_session";
+
+const authStore = {
+  get() {
+    try { return JSON.parse(localStorage.getItem(AUTH_KEY) || "null"); }
+    catch { return null; }
+  },
+  set(session) {
+    if (session) localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+    else localStorage.removeItem(AUTH_KEY);
+  },
+  clear() { localStorage.removeItem(AUTH_KEY); }
+};
+
+// Заголовки: если есть сессия — используем её токен, иначе anon
+const supaHeaders = () => {
+  const session = authStore.get();
+  const token = session?.access_token || SUPABASE_KEY;
+  return {
+    "apikey": SUPABASE_KEY,
+    "Authorization": "Bearer " + token,
+    "Content-Type": "application/json"
+  };
+};
+
+const auth = {
+  async signIn(email, password) {
+    const res = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=password", {
+      method: "POST",
+      headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error_description || data.msg || data.error || "Ошибка входа");
+    authStore.set({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+      email: data.user?.email || email
+    });
+    return data;
+  },
+  async refresh() {
+    const session = authStore.get();
+    if (!session?.refresh_token) return false;
+    try {
+      const res = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=refresh_token", {
+        method: "POST",
+        headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: session.refresh_token })
+      });
+      const data = await res.json();
+      if (!res.ok) return false;
+      authStore.set({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+        email: data.user?.email || session.email
+      });
+      return true;
+    } catch { return false; }
+  },
+  // Проверяет валидность сессии, обновляет при необходимости
+  async ensureValid() {
+    const session = authStore.get();
+    if (!session) return false;
+    // Обновляем за 5 минут до истечения
+    if (session.expires_at && Date.now() > session.expires_at - 5 * 60 * 1000) {
+      return await this.refresh();
+    }
+    return true;
+  },
+  signOut() { authStore.clear(); },
+  isSignedIn() { return !!authStore.get()?.access_token; },
+  email() { return authStore.get()?.email || ""; }
 };
 
 const isAppKey = (k) => k && (k.startsWith("meeting:") || k.startsWith("task:") || k.startsWith("team:") || k === "tg-config");
 
 const cloud = {
   async fetchAll() {
-    const res = await fetch(SUPABASE_URL + "/rest/v1/kv_store?select=key,value", { headers: _supaHeaders });
+    await auth.ensureValid();
+    const res = await fetch(SUPABASE_URL + "/rest/v1/kv_store?select=key,value", { headers: supaHeaders() });
+    if (res.status === 401) throw new Error("AUTH_REQUIRED");
     if (!res.ok) throw new Error("Supabase GET " + res.status);
     return await res.json();
   },
   async upsert(key, value) {
-    await fetch(SUPABASE_URL + "/rest/v1/kv_store", {
+    await auth.ensureValid();
+    const res = await fetch(SUPABASE_URL + "/rest/v1/kv_store", {
       method: "POST",
-      headers: { ..._supaHeaders, "Prefer": "resolution=merge-duplicates" },
+      headers: { ...supaHeaders(), "Prefer": "resolution=merge-duplicates" },
       body: JSON.stringify({ key, value, updated_at: new Date().toISOString() })
     });
+    if (res.status === 401) throw new Error("AUTH_REQUIRED");
   },
   async remove(key) {
-    await fetch(SUPABASE_URL + "/rest/v1/kv_store?key=eq." + encodeURIComponent(key), {
-      method: "DELETE", headers: _supaHeaders
+    await auth.ensureValid();
+    const res = await fetch(SUPABASE_URL + "/rest/v1/kv_store?key=eq." + encodeURIComponent(key), {
+      method: "DELETE", headers: supaHeaders()
     });
+    if (res.status === 401) throw new Error("AUTH_REQUIRED");
   }
 };
 
-// Начальная синхронизация: cloud → localStorage (или localStorage → cloud при первом запуске)
+// Начальная синхронизация: безопасный merge между облаком и localStorage.
+// НИКОГДА не удаляет локальные данные — только добавляет и обновляет.
 const syncFromCloud = async () => {
   try {
     const rows = await cloud.fetchAll();
-    if (rows.length > 0) {
-      // Облако имеет данные → загружаем в localStorage
-      for (const { key, value } of rows) localStorage.setItem(key, value);
-      // Удаляем локальные ключи которых нет в облаке (облако = источник правды)
-      const cloudKeys = new Set(rows.map(r => r.key));
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (isAppKey(k) && !cloudKeys.has(k)) localStorage.removeItem(k);
-      }
-      console.log("☁ Синхронизация: загружено " + rows.length + " записей из облака");
-    } else {
-      // Облако пустое → выгружаем локальные данные в облако
-      let pushed = 0;
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (isAppKey(k)) { await cloud.upsert(k, localStorage.getItem(k)); pushed++; }
-      }
-      if (pushed) console.log("☁ Первая синхронизация: выгружено " + pushed + " записей в облако");
+
+    // Собираем локальные ключи приложения
+    const localKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (isAppKey(k)) localKeys.push(k);
     }
+
+    if (rows.length === 0) {
+      // Облако пустое (первый запуск ИЛИ сбой) → заливаем локальное, ничего не удаляем
+      let pushed = 0;
+      for (const k of localKeys) {
+        try { await cloud.upsert(k, localStorage.getItem(k)); pushed++; } catch {}
+      }
+      console.log(pushed
+        ? `☁ Облако было пустым — выгружено ${pushed} локальных записей`
+        : "☁ Облако и локальное хранилище пусты");
+      return;
+    }
+
+    // Облако не пустое → загружаем всё оттуда в localStorage
+    const cloudKeys = new Set();
+    for (const { key, value } of rows) {
+      localStorage.setItem(key, value);
+      cloudKeys.add(key);
+    }
+
+    // Локальные ключи, которых нет в облаке → НЕ удаляем, а доливаем в облако.
+    // Это защита: если облако отдало неполный ответ, мы не потеряем локальные данные.
+    let pushedBack = 0;
+    for (const k of localKeys) {
+      if (!cloudKeys.has(k)) {
+        try { await cloud.upsert(k, localStorage.getItem(k)); pushedBack++; } catch {}
+      }
+    }
+
+    console.log(`☁ Синхронизация: получено ${rows.length} из облака` +
+      (pushedBack ? `, догружено ${pushedBack} локальных записей в облако` : ""));
   } catch (e) {
+    if (e.message === "AUTH_REQUIRED") {
+      console.warn("☁ Требуется вход — синхронизация пропущена");
+      auth.signOut();
+      return;
+    }
     console.warn("☁ Синхронизация не удалась, работаем локально:", e.message);
   }
 };
@@ -1479,7 +1582,96 @@ const STYLES = `
 /* ============================================================
    MAIN APP
    ============================================================ */
+/* ============================================================
+   ЭКРАН ВХОДА
+   ============================================================ */
+function LoginScreen({ onSuccess }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const submit = async () => {
+    if (!email.trim() || !password) return;
+    setLoading(true); setError(null);
+    try {
+      await auth.signIn(email.trim(), password);
+      onSuccess();
+    } catch (e) {
+      const msg = e.message || "";
+      if (msg.includes("Invalid login") || msg.includes("invalid_grant")) {
+        setError("Неверный email или пароль");
+      } else if (msg.includes("Email not confirmed")) {
+        setError("Email не подтверждён. В Supabase → Authentication → Users включите «Auto Confirm User» для этого пользователя.");
+      } else {
+        setError(msg || "Не удалось войти");
+      }
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <>
+      <style>{STYLES}</style>
+      <div className="app">
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div className="card" style={{ maxWidth: 400, width: '100%' }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div className="display" style={{ fontSize: 30, marginBottom: 4 }}>Повестка</div>
+              <div className="small" style={{ letterSpacing: '0.06em', textTransform: 'uppercase' }}>Этажи Владивосток</div>
+            </div>
+
+            <label>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(null); }}
+              onKeyDown={e => { if (e.key === 'Enter') document.getElementById('pw-field')?.focus(); }}
+              autoFocus
+              autoComplete="username"
+              placeholder="ваш email"
+            />
+
+            <label style={{ marginTop: 14 }}>Пароль</label>
+            <input
+              id="pw-field"
+              type="password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(null); }}
+              onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+              autoComplete="current-password"
+              placeholder="••••••••"
+            />
+
+            {error && (
+              <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'var(--warn-tint)', color: 'var(--warn)', fontSize: 13 }}>
+                {error}
+              </div>
+            )}
+
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: 20, justifyContent: 'center' }}
+              onClick={submit}
+              disabled={loading || !email.trim() || !password}
+            >
+              {loading ? <><Loader2 size={14} className="spin"/> Вход…</> : <>Войти</>}
+            </button>
+
+            <div className="small" style={{ marginTop: 16, textAlign: 'center' }}>
+              Вход нужен один раз на устройстве — дальше браузер запомнит
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function App() {
+  // ─── Авторизация (только для сайта, не для артефакта) ───
+  const [authed, setAuthed] = useState(() => _artifactStorage ? true : auth.isSignedIn());
+  const [authChecking, setAuthChecking] = useState(() => !_artifactStorage && auth.isSignedIn());
+
   const [view, setView] = useState("new"); // 'new' | 'history' | 'personal' | 'tasks'
   const [meetings, setMeetings] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -1495,8 +1687,20 @@ function App() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importText, setImportText] = useState("");
 
+  // Проверка сохранённой сессии при старте
+  useEffect(() => {
+    if (_artifactStorage) return; // в артефакте авторизация не нужна
+    if (!auth.isSignedIn()) { setAuthChecking(false); return; }
+    (async () => {
+      const ok = await auth.ensureValid();
+      if (!ok) { auth.signOut(); setAuthed(false); }
+      setAuthChecking(false);
+    })();
+  }, []);
+
   // load on mount
   useEffect(() => {
+    if (!authed) return; // не грузим данные пока не авторизованы
     (async () => {
       // Шаг 0: синхронизация с облаком (если не артефакт)
       if (!_artifactStorage) {
@@ -1546,7 +1750,7 @@ function App() {
 
       setLoading(false);
     })();
-  }, []);
+  }, [authed]);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -1643,6 +1847,26 @@ function App() {
     });
   }, [personalMeetings, team]);
 
+  // ─── Экран входа / проверка сессии ───
+  if (!_artifactStorage) {
+    if (authChecking) {
+      return (
+        <>
+          <style>{STYLES}</style>
+          <div className="app">
+            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--ink-3)' }}>
+              <Loader2 size={28} className="spin"/>
+              <div>Проверка входа…</div>
+            </div>
+          </div>
+        </>
+      );
+    }
+    if (!authed) {
+      return <LoginScreen onSuccess={() => { setAuthed(true); setLoading(true); }} />;
+    }
+  }
+
   return (
     <>
       <style>{STYLES}</style>
@@ -1662,8 +1886,7 @@ function App() {
               </button>
               <button className="btn btn-sm" onClick={() => setShowImportModal(true)} title="Вставить данные из артефакта Claude">
                 <Upload size={13}/> Импорт
-              </button>
-              <button className="btn btn-sm" onClick={async () => {
+              </button>              <button className="btn btn-sm" onClick={async () => {
                 const allData = {};
                 for (let i = 0; i < localStorage.length; i++) {
                   const k = localStorage.key(i);
@@ -1683,6 +1906,18 @@ function App() {
               {!_artifactStorage && (
                 <button className={`btn btn-sm ${tgConfig?.chats?.length ? "btn-tg-connected" : ""}`} onClick={() => setShowTgModal(true)} title="Настройки Telegram">
                   <Send size={13}/> Telegram{tgConfig?.chats?.length ? ` · ${tgConfig.chats.length}` : " ⚙"}
+                </button>
+              )}
+              {!_artifactStorage && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  title={`Выйти (${auth.email()})`}
+                  onClick={() => askConfirm("Выйти из аккаунта? Данные останутся в облаке.", () => {
+                    auth.signOut();
+                    setAuthed(false);
+                  })}
+                >
+                  <X size={13}/> Выход
                 </button>
               )}
             </div>

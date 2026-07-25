@@ -1955,7 +1955,7 @@ function App() {
               showToast={showToast}
             />
           ) : view === 'new' ? (
-            <NewMeetingView onSave={saveMeeting} showToast={showToast} existingEmployees={existingEmployees} team={team} allTasks={tasks} onUpdateTask={updateTask} />
+            <NewMeetingView onSave={saveMeeting} showToast={showToast} existingEmployees={existingEmployees} team={team} allTasks={tasks} onUpdateTask={updateTask} tgConfig={tgConfig} />
           ) : view === 'history' ? (
             <HistoryView meetings={groupMeetings} onSelect={setSelectedMeeting} onRename={renameMeeting} />
           ) : view === 'personal' ? (
@@ -2145,7 +2145,7 @@ function ConfirmDialog({ message, danger, confirmLabel, onConfirm, onCancel }) {
 /* ============================================================
    NEW MEETING VIEW — paste, generate, review, save
    ============================================================ */
-function NewMeetingView({ onSave, showToast, existingEmployees = [], team = [], allTasks = [], onUpdateTask }) {
+function NewMeetingView({ onSave, showToast, existingEmployees = [], team = [], allTasks = [], onUpdateTask, tgConfig }) {
   const [meetingType, setMeetingType] = useState("group"); // 'group' | 'personal'
   const [employee, setEmployee] = useState("");
   const [transcription, setTranscription] = useState("");

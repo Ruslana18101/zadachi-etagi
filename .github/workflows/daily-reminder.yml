@@ -1,0 +1,17 @@
+name: Daily Task Reminder
+
+on:
+  schedule:
+    # 23:00 UTC воскресенье-четверг = 09:00 Владивосток понедельник-пятница
+    - cron: '0 23 * * 0,1,2,3,4'
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram reminder
+        run: |
+          curl -s -X POST "${{ secrets.VERCEL_SITE_URL }}/api/remind" \
+            -H "x-reminder-secret: ${{ secrets.REMINDER_SECRET }}"
+          echo "Reminder triggered at $(date)"

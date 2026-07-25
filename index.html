@@ -2228,12 +2228,6 @@ function NewMeetingView({ onSave, showToast, existingEmployees = [], team = [], 
       setError("Укажите имя сотрудника для личной встречи.");
       return;
     }
-    // Сайт не может вызывать Anthropic API напрямую (CORS + нет API ключа).
-    // Генерация работает ТОЛЬКО в артефакте Claude.
-    if (!_artifactStorage) {
-      setError("Генерация повесток из транскрипции работает только в артефакте Claude (там Anthropic разрешает вызовы ИИ).\n\nНа сайте: создавайте повестки в артефакте → нажимайте «Экспорт данных» → возвращайтесь сюда → «Импорт». Все собрания и задачи синхронизируются.\n\nСайт нужен чтобы: смотреть историю, управлять задачами, отправлять напоминания через бот, синхронизировать данные между устройствами.");
-      return;
-    }
     setGenerating(true);
     setError(null);
     try {
@@ -2242,12 +2236,34 @@ function NewMeetingView({ onSave, showToast, existingEmployees = [], team = [], 
         if (t.assignees.length === 0) return true;
         return t.assignees.some(a => a.status !== "done");
       });
-      const result = await generateFromTranscription(transcription, {
-        type: meetingType,
-        employee: meetingType === "personal" ? employee.trim() : null,
-        team,
-        existingTasks: openTasks
-      });
+
+      let result;
+      if (_artifactStorage) {
+        // В артефакте — прямой вызов Anthropic (как раньше)
+        result = await generateFromTranscription(transcription, {
+          type: meetingType,
+          employee: meetingType === "personal" ? employee.trim() : null,
+          team,
+          existingTasks: openTasks
+        });
+      } else {
+        // На сайте — через свою серверную функцию (OpenRouter/DeepSeek)
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transcription,
+            type: meetingType,
+            employee: meetingType === "personal" ? employee.trim() : null,
+            team,
+            existingTasks: openTasks
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Ошибка сервера (" + res.status + ")");
+        result = data;
+      }
+
       setDraft({
         title: result.title || (meetingType === "personal" ? `1-на-1: ${employee}` : "Собрание"),
         agenda: result.agenda || "",
@@ -2395,21 +2411,7 @@ function NewMeetingView({ onSave, showToast, existingEmployees = [], team = [], 
           </div>
         )}
 
-        {/* Информационный баннер для сайта */}
-        {!_artifactStorage && (
-          <div style={{
-            padding: '14px 18px', marginBottom: 20,
-            background: 'var(--accent-tint)', border: '1.5px solid var(--accent)',
-            borderRadius: 'var(--radius-sm)', fontSize: 13, lineHeight: 1.6
-          }}>
-            <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--accent-2)' }}>
-              ℹ️ Генерация повесток только в артефакте Claude
-            </div>
-            <div style={{ color: 'var(--ink-2)' }}>
-              Сайт не может вызывать ИИ напрямую (ограничения CORS). Создавайте повестки в <strong>артефакте Claude</strong> → жмите <strong>«📋 Экспорт данных»</strong> → возвращайтесь сюда → <strong>«⬆ Импорт»</strong>. Здесь управляйте задачами, историей, отправкой в Telegram.
-            </div>
-          </div>
-        )}
+        {/* Генерация теперь работает и на сайте — через серверную функцию (OpenRouter/DeepSeek) */}
 
         {/* Тип собрания */}
         <div className="type-toggle">

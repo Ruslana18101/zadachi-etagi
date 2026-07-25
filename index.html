@@ -1793,9 +1793,54 @@ function App() {
     showToast("Название обновлено");
   };
 
+  // Сравнивает старую и новую версию задачи, строит записи истории изменений.
+  // Централизованно — не нужно трогать каждое место где вызывается updateTask.
+  const diffTaskForHistory = (oldTask, newTask) => {
+    if (!oldTask) return [];
+    const entries = [];
+    const now = Date.now();
+
+    // Название / описание
+    if (oldTask.title !== newTask.title) {
+      entries.push({ ts: now, type: "title", from: oldTask.title, to: newTask.title });
+    }
+
+    // По каждому исполнителю: статус и срок
+    const oldByName = {}; for (const a of (oldTask.assignees || [])) oldByName[a.name] = a;
+    const newByName = {}; for (const a of (newTask.assignees || [])) newByName[a.name] = a;
+
+    for (const name of Object.keys(newByName)) {
+      const oa = oldByName[name], na = newByName[name];
+      if (!oa) { entries.push({ ts: now, type: "assignee_added", assignee: name }); continue; }
+      if (oa.status !== na.status) {
+        entries.push({ ts: now, type: "status", assignee: name, from: oa.status, to: na.status });
+      }
+      const oldDue = oa.dueDate || oldTask.dueDate;
+      const newDue = na.dueDate || newTask.dueDate;
+      if (oldDue !== newDue) {
+        entries.push({ ts: now, type: "postpone", assignee: name, from: oldDue, to: newDue });
+      }
+    }
+    for (const name of Object.keys(oldByName)) {
+      if (!newByName[name]) entries.push({ ts: now, type: "assignee_removed", assignee: name });
+    }
+
+    // Срок на уровне задачи (если нет исполнителей)
+    if ((!newTask.assignees || newTask.assignees.length === 0) && oldTask.dueDate !== newTask.dueDate) {
+      entries.push({ ts: now, type: "postpone", assignee: null, from: oldTask.dueDate, to: newTask.dueDate });
+    }
+
+    return entries;
+  };
+
   const updateTask = async (task) => {
-    await storage.set(`task:${task.id}`, task);
-    setTasks(prev => prev.map(t => t.id === task.id ? task : t));
+    const oldTask = tasks.find(t => t.id === task.id);
+    const newEntries = diffTaskForHistory(oldTask, task);
+    const finalTask = newEntries.length > 0
+      ? { ...task, history: [...(task.history || oldTask?.history || []), ...newEntries] }
+      : task;
+    await storage.set(`task:${finalTask.id}`, finalTask);
+    setTasks(prev => prev.map(t => t.id === finalTask.id ? finalTask : t));
   };
 
   const deleteTask = (id) => {
@@ -4057,6 +4102,57 @@ function TaskCard({ task, onUpdate, onDelete, meetingLabel, onMeetingClick, show
           )}
         </div>
       </div>
+
+      {/* История изменений */}
+      {task.history && task.history.length > 0 && (
+        <TaskHistorySection history={task.history} />
+      )}
+    </div>
+  );
+}
+
+function TaskHistorySection({ history }) {
+  const [expanded, setExpanded] = useState(false);
+  const sorted = [...history].sort((a, b) => b.ts - a.ts);
+
+  const fmtDate = (ts) => {
+    if (!ts) return "без срока";
+    const d = new Date(ts);
+    return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear();
+  };
+  const fmtWhen = (ts) => {
+    const d = new Date(ts);
+    return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  };
+  const STATUS_RU = { pending: "не сделано", "in-progress": "в работе", done: "готово" };
+
+  const describe = (e) => {
+    if (e.type === "status") return (e.assignee ? e.assignee + ": " : "") + "статус → «" + (STATUS_RU[e.to] || e.to) + "»";
+    if (e.type === "postpone") return (e.assignee ? e.assignee + ": " : "") + "срок " + fmtDate(e.from) + " → " + fmtDate(e.to);
+    if (e.type === "title") return "название изменено";
+    if (e.type === "assignee_added") return "добавлен исполнитель: " + e.assignee;
+    if (e.type === "assignee_removed") return "удалён исполнитель: " + e.assignee;
+    return "";
+  };
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        className="btn btn-ghost btn-sm"
+        onClick={() => setExpanded(x => !x)}
+        style={{ padding: '3px 8px', fontSize: 11.5, color: 'var(--ink-3)' }}
+      >
+        <Clock size={11}/> История ({history.length}) {expanded ? "▲" : "▼"}
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 6, paddingLeft: 8, borderLeft: '2px solid var(--surface-2)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {sorted.map((e, i) => (
+            <div key={i} style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+              <span style={{ color: 'var(--ink-3)' }}>{fmtWhen(e.ts)}</span> — {describe(e)}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

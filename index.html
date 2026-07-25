@@ -55,6 +55,7 @@ const SvgI = ({children, size = 24, className, style, ...rest}) => (
 const Plus = p => <SvgI {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></SvgI>;
 const Calendar = p => <SvgI {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></SvgI>;
 const CheckSquare = p => <SvgI {...p}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></SvgI>;
+const BarChart3 = p => <SvgI {...p}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></SvgI>;
 const Square = p => <SvgI {...p}><rect x="3" y="3" width="18" height="18" rx="2"/></SvgI>;
 const MinusSquare = p => <SvgI {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></SvgI>;
 const ChevronRight = p => <SvgI {...p}><polyline points="9 18 15 12 9 6"/></SvgI>;
@@ -1936,6 +1937,9 @@ function App() {
             <button className={`tab ${view==='tasks'?'active':''}`} onClick={() => { setView('tasks'); setSelectedMeeting(null); }}>
               <CheckSquare size={15}/> Задачи
             </button>
+            <button className={`tab ${view==='analytics'?'active':''}`} onClick={() => { setView('analytics'); setSelectedMeeting(null); }}>
+              <BarChart3 size={15}/> Аналитика
+            </button>
           </div>
 
           {loading ? (
@@ -1970,6 +1974,8 @@ function App() {
               onUpdateTask={updateTask}
               onDeleteTask={deleteTask}
             />
+          ) : view === 'analytics' ? (
+            <AnalyticsView tasks={tasks} team={team} />
           ) : (
             <TasksView tasks={tasks} meetings={meetings} team={team} tgConfig={tgConfig} onUpdate={updateTask} onDelete={deleteTask} onAdd={addTask} onSelectMeeting={setSelectedMeeting} showToast={showToast} />
           )}
@@ -3038,6 +3044,133 @@ function PersonalView({ personalMeetings, tasks, selectedEmployee, setSelectedEm
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   АНАЛИТИКА ПО ИСПОЛНИТЕЛЯМ
+   ============================================================ */
+const ANALYTICS_PERIODS = [
+  { key: "week", label: "Неделя", days: 7 },
+  { key: "month", label: "Месяц", days: 30 },
+  { key: "quarter", label: "3 месяца", days: 90 },
+  { key: "all", label: "Всё время", days: null },
+];
+
+function computeAssigneeStats(tasks, cutoffTs) {
+  const stats = {}; // name -> { total, done, overdueOpen, postponedSum }
+
+  for (const t of tasks) {
+    if (cutoffTs && (t.createdAt || 0) < cutoffTs) continue;
+    const assignees = t.assignees || [];
+    for (const a of assignees) {
+      if (!a.name) continue;
+      if (!stats[a.name]) stats[a.name] = { total: 0, done: 0, overdueOpen: 0, postponedSum: 0 };
+      const s = stats[a.name];
+      s.total++;
+      if (a.status === "done") {
+        s.done++;
+      } else {
+        const effectiveDue = a.dueDate || t.dueDate;
+        if (effectiveDue && effectiveDue < Date.now()) s.overdueOpen++;
+      }
+      const postponed = (a.postponedCount ?? t.postponedCount ?? 0);
+      s.postponedSum += postponed;
+    }
+  }
+
+  const rows = Object.entries(stats).map(([name, s]) => {
+    const cleanRatio = s.total > 0 ? (s.total - s.overdueOpen) / s.total : 0;
+    const avgPostponed = s.total > 0 ? s.postponedSum / s.total : 0;
+    return { name, ...s, cleanRatio, avgPostponed };
+  });
+
+  rows.sort((a, b) => (b.cleanRatio - a.cleanRatio) || (a.avgPostponed - b.avgPostponed));
+  return rows;
+}
+
+function AnalyticsView({ tasks, team = [] }) {
+  const [periodKey, setPeriodKey] = useState("month");
+
+  const rows = useMemo(() => {
+    const period = ANALYTICS_PERIODS.find(p => p.key === periodKey);
+    const cutoff = period && period.days ? Date.now() - period.days * 86400000 : null;
+    return computeAssigneeStats(tasks, cutoff);
+  }, [tasks, periodKey]);
+
+  if (rows.length === 0) {
+    return (
+      <div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+          {ANALYTICS_PERIODS.map(p => (
+            <button key={p.key} className={`filter-btn ${periodKey === p.key ? 'active' : ''}`} onClick={() => setPeriodKey(p.key)}>{p.label}</button>
+          ))}
+        </div>
+        <div className="empty"><BarChart3 size={28}/><div>Нет данных за выбранный период</div></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+        {ANALYTICS_PERIODS.map(p => (
+          <button key={p.key} className={`filter-btn ${periodKey === p.key ? 'active' : ''}`} onClick={() => setPeriodKey(p.key)}>{p.label}</button>
+        ))}
+      </div>
+
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>🏆 Рейтинг — от лучшего к худшему</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {rows.map((r, i) => {
+            const pct = Math.round(r.cleanRatio * 100);
+            const barColor = pct >= 80 ? 'var(--accent)' : pct >= 50 ? 'var(--pending)' : 'var(--warn)';
+            return (
+              <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 22, textAlign: 'center', fontWeight: 700, color: 'var(--ink-3)', fontSize: 13, flexShrink: 0 }}>
+                  {i + 1}
+                </div>
+                <div style={{ width: 150, fontWeight: 600, fontSize: 13.5, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {r.name}
+                </div>
+                <div style={{ flex: 1, height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: pct + '%', height: '100%', background: barColor, borderRadius: 4 }} />
+                </div>
+                <div style={{ width: 100, textAlign: 'right', fontSize: 12.5, color: 'var(--ink-2)', flexShrink: 0 }}>
+                  {pct}% без просрочки
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 14 }}>
+        {rows.map(r => (
+          <div key={r.name} className="card">
+            <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 12 }}>{r.name}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--ink-3)' }}>Всего задач</span>
+                <span style={{ fontWeight: 600 }}>{r.total}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--ink-3)' }}>✓ Выполнено</span>
+                <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{r.done}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--ink-3)' }}>⚠️ Просрочено сейчас</span>
+                <span style={{ fontWeight: 600, color: r.overdueOpen > 0 ? 'var(--warn)' : 'var(--ink-2)' }}>{r.overdueOpen}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--ink-3)' }}>↻ Ср. число переносов</span>
+                <span style={{ fontWeight: 600 }}>{r.avgPostponed.toFixed(1)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
